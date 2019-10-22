@@ -1,20 +1,28 @@
 import uuid
 
-def build_PING_msg():
-    msg = { 'method': 'PING' }
-    return msg
+def build_PING_msg(senderID):
+    return { 'operation': 'EXECUTE',
+             'method': 'PING',
+             'sender_id': senderID,
+             'key': generate_random_id() }
 
-def build_FIND_NODE_msg(ID):
-    msg = { 'method': 'FIND_NODE', 'id' : ID }
-    return msg
+def build_FIND_NODE_msg(ID, senderID):
+    return { 'operation': 'EXECUTE',
+            'method': 'FIND_NODE', 'id' : ID,
+            'sender_id': senderID,
+            'key': generate_random_id() }
 
-def build_FIND_VALUE_msg(ID):
-    msg = { 'method': 'FIND_VALUE', 'id' : ID }
-    return msg
+def build_FIND_VALUE_msg(ID, senderID):
+    return { 'operation': 'EXECUTE',
+             'method': 'FIND_VALUE', 'id' : ID,
+             'sender_id' : senderID,
+             'key': generate_random_id() }
 
-def build_STORE_msg(key, value):
-    msg = { 'method': 'STORE', 'storeKey' : key, 'storeValue' : value }
-    return msg
+def build_STORE_msg(key, value, senderID):
+    return { 'operation': 'EXECUTE',
+             'method': 'STORE', 'store_key' : key, 'store_value' : value,
+             'sender_id': senderID,
+             'key': generate_random_id() }
 
 def generate_random_id():
     return uuid.uuid4().hex

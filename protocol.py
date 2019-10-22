@@ -17,6 +17,12 @@ class Node:
         # return f'({self.ID}, {self.ip}, {self.port})'
         return str((self.ID, self.ip, self.port))
 
+    def print_routing_table(self):
+        r = ''
+        for i in range(len(self.route_table)):
+            r += '[' + str(2**i) + ',' + str(2**(i + 1)) + '): ' + str(self.route_table[i]) + '\n'
+        return r
+
     def get_all_nodes(self, ID):
         nodes = []
         for k_bucket in self.route_table:
