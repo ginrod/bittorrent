@@ -12,14 +12,15 @@ if __name__ == "__main__":
 
     import io
 
-    reader = open('input', 'r')
+    reader = open('input.txt', 'r')
     commands = reader.readlines()
 
-    # while True:
-    for command in commands:
-        input_msg = command.split()
+    while True:
+    # for command in commands:
+        # input_msg = command.split()
+        # print(input_msg)
         # input_msg = input_msg[0:-1] if input_msg[-1] == '\n' else input_msg
-        # input_msg = input("[PORT] [OPERATION] [OP_PORT] [METHOD] [ARGS...]\n").split()
+        input_msg = input("[PORT] [OPERATION] [OP_PORT] [METHOD] [ARGS...]\n").split()
 
         addr = 'localhost', int(input_msg[0])
         data = {'operation': input_msg[1], 'method': input_msg[3], 'ip': 'localhost', 'port': int(input_msg[2])}
@@ -37,13 +38,13 @@ if __name__ == "__main__":
         try:
             data, addr1 = s.recvfrom(1024)
             data = json.loads(data)
-        except:
+        except socket.timeout:
             print("Timeout error")
             continue
 
 
         print("Answer from RPC executded from address " + str(addr[0]) + ":" + str(addr[1]) + "is " + str(data['result']))
-    
+
     reader.close()
 
 

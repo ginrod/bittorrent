@@ -14,14 +14,23 @@ class Node:
         self.route_table = [[] for _ in range(B)]
 
     def __repr__(self):
-        # return f'({self.ID}, {self.ip}, {self.port})'
-        return str((self.ID, self.ip, self.port))
+        return f'({self.ID}, {self.ip}, {self.port})'
+        # return str((self.ID, self.ip, self.port))
+
+    def __iter__(self):
+        return iter([self.ID, self.ip, self.port])
 
     def print_routing_table(self):
+        def format(kBucket):
+            elements = []
+            for n in kBucket:
+                elements.append(n[0])
+            return elements
+
         r = ''
         for i in range(len(self.route_table)):
-            r += '[' + str(2**i) + ',' + str(2**(i + 1)) + '): ' + str(self.route_table[i]) + '\n'
-        return r
+            r += '[' + str(2**i) + ',' + str(2**(i + 1)) + '): ' + str(format(self.route_table[i])) + '\n'
+        print(r)
 
     def get_all_nodes(self, ID):
         nodes = []
