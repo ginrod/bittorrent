@@ -10,8 +10,10 @@ class Node:
 
         self.alpha = alpha
         self.k = k
+        self.B = B
 
         self.route_table = [[] for _ in range(B)]
+
 
     def __repr__(self):
         return f'({self.ID}, {self.ip}, {self.port})'
@@ -43,7 +45,7 @@ class Node:
         d = self.distance_to((senderID, ))
         i = int(math.log2(d))
 
-        return self.route_table[i]
+        return (self.route_table[i], i)
 
     def distance_to(self, other):
         return self.ID ^ other[0]
@@ -58,6 +60,28 @@ class Node:
         return True
 
     def FIND_NODE(self, ID):
-        nodes = self.get_all_nodes(ID)
-        k_closest = heapq.nsmallest(self.k, nodes)
-        return k_closest
+        k_bucket, i = self.find_kBucket(ID)
+        heap = []
+        k_closest = [ (ID ^ n[0], n) for n in k_bucket]
+        inf, sup = i-1,i+1
+        while len(k_closest) < self.k and (inf >=0 or sup < self.B):
+            if inf >= 0:
+                heap += [(ID ^ n[0], n) for n in self.route_table[inf]]
+                inf -= 1
+            if sup < self.B:
+                heap += [(ID ^ n[0], n) for n in self.route_table[sup]]
+                sup += 1
+
+            if len(k_closest) + len(heap) >= self.k:
+                for _ in range(self.k - len(k_closest)):
+                    k_closest.append(heapq.heappop(heap))
+
+        return [n for _, n in k_closest]
+
+
+
+
+
+
+
+

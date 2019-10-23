@@ -32,20 +32,24 @@ def generate_random_id():
 
 
 
-def sendall_to(msg, addr, socket, time_out=5):
-    sent = 0
-    start = time.time()
-    while sent < len(msg) and time.time() - start < time_out:
-        sent += socket.sendto(msg, addr)
-    if sent != len(msg):
-        raise socket.timeout
+# def sendall_to(msg, addr, socket, time_out=5):
+#     sent = 0
+#     start = time.time()
+#     while sent < len(msg) and time.time() - start < time_out:
+#         sent += socket.sendto(msg, addr)
+#     if sent != len(msg):
+#         raise socket.timeout
 
-def get_answer(expected_key, s:socket.socket, attempts=3):
+# def get_answer(expected_key, s:socket.socket, attempts=3):
 
-    for _ in range(attempts):
-        data = json.loads(s.recvfrom(1024)[0])
+#     for _ in range(attempts):
+#         data = json.loads(s.recvfrom(1024)[0])
 
-        if data['key'] == expected_key:
-            return data
+#         if data['key'] == expected_key:
+#             return data
 
-    raise socket.timeout
+#     raise socket.timeout
+
+def build_xor_table(address_space):
+    xor_table = [[i ^ j for i in range(address_space)] for j in range(address_space)]
+    return xor_table

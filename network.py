@@ -106,7 +106,7 @@ class Peer:
         senderID = senderNode[0]
 
         #Find the appropiate k-bucket for the sender id
-        kBucket = self.node.find_kBucket(senderID)
+        kBucket,_ = self.node.find_kBucket(senderID)
 
         #If the sending node already exists in the k-bucket
         if senderNode in kBucket:
@@ -193,8 +193,6 @@ class Peer:
                         break
 
         return heapq.nsmallest(self.node.k, enquired)
-
-
 
 
 if __name__ == '__main__':
