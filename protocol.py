@@ -60,11 +60,15 @@ class Node:
         return True
 
     def FIND_NODE(self, ID):
+        return self.get_n_closest(ID, self.k)
+
+
+    def get_n_closest(self, ID, n):
         k_bucket, i = self.find_kBucket(ID)
         heap = []
-        k_closest = [ (ID ^ n[0], n) for n in k_bucket]
+        n_closest = [ (ID ^ n[0], n) for n in k_bucket]
         inf, sup = i-1,i+1
-        while len(k_closest) < self.k and (inf >=0 or sup < self.B):
+        while len(n_closest) < n and (inf >=0 or sup < self.B):
             if inf >= 0:
                 heap += [(ID ^ n[0], n) for n in self.route_table[inf]]
                 inf -= 1
@@ -72,16 +76,8 @@ class Node:
                 heap += [(ID ^ n[0], n) for n in self.route_table[sup]]
                 sup += 1
 
-            if len(k_closest) + len(heap) >= self.k:
-                for _ in range(self.k - len(k_closest)):
-                    k_closest.append(heapq.heappop(heap))
+            if len(n_closest) + len(heap) >= n:
+                for _ in range(n - len(n_closest)):
+                    n_closest.append(heapq.heappop(heap))
 
-        return [n for _, n in k_closest]
-
-
-
-
-
-
-
-
+        return [node for _, node in n_closest]

@@ -138,11 +138,7 @@ class Peer:
         self.node.print_routing_table()
 
     def lookup(self, ID):
-        #Insert all nodes of the k-bucket list of start on a list
-        nodes = self.node.get_all_nodes(ID)
-
-        #Select the alpha closest nodes to ID
-        to_query = heapq.nsmallest(self.node.alpha, nodes)
+        to_query = self.node.get_n_closest(ID, self.node.alpha)
 
         pending = []
         heapq.heapify(pending)
@@ -156,12 +152,15 @@ class Peer:
             for n in to_query:
 
                 # k_closest = n[1].FIND_NODE(ID, self.node.k)
-                k_closest = None
-                msg = utils.build_FIND_NODE_msg(ID, self.node)
+                msg = utils.build_FIND_NODE_msg(ID, n)
+                ip, port = n[1], n[2]
+                self.socket.sendto(msg, (ip, port))
+                k_closest = []
                 try:
-                    k_closest = self.RPC(msg, (n[1][0], n[1][2]))
-                except:
-                    # What to do if the RPC doesn't work
+                    data = utils.get_answer(msg['key'], self.socket)
+                    k_closest = data['result']
+                    self.update(tuple(data['sender']))
+                except socket.timeout:
                     pass
 
                 enquired.append(n)
@@ -176,21 +175,14 @@ class Peer:
             if pending == []:
                 break
 
-
             c = heapq.nsmallest(1, pending)
-            if c[0] <= closest_node[0]:
-                closest_node = c
-                for _ in range(self.node.alpha):
-                    try:
-                        to_query.append(heapq.heappop(pending))
-                    except:
-                        break
-            else:
-                for _ in range(self.node.k):
-                    try:
-                        to_query.append(heapq.heappop(pending))
-                    except:
-                        break
+
+            top = self.node.alpha if c[0] <= closest_node[0] else self.node.k
+            for _ in range(top):
+                try:
+                    to_query.append(heapq.heappop(pending))
+                except:
+                    break
 
         return heapq.nsmallest(self.node.k, enquired)
 
