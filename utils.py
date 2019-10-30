@@ -1,31 +1,55 @@
 import uuid
+import socket
+import time
+import json
 
-def build_PING_msg(senderID):
+def build_PING_msg(sender):
     return { 'operation': 'EXECUTE',
              'method': 'PING',
-             'sender_id': senderID,
+             'sender': list(sender),
              'key': generate_random_id() }
 
-def build_FIND_NODE_msg(ID, senderID):
+def build_FIND_NODE_msg(ID, sender):
     return { 'operation': 'EXECUTE',
             'method': 'FIND_NODE', 'id' : ID,
-            'sender_id': senderID,
+            'sender': list(sender),
             'key': generate_random_id() }
 
-def build_FIND_VALUE_msg(ID, senderID):
+def build_FIND_VALUE_msg(ID, sender):
     return { 'operation': 'EXECUTE',
              'method': 'FIND_VALUE', 'id' : ID,
-             'sender_id' : senderID,
+             'sender' : list(sender),
              'key': generate_random_id() }
 
-def build_STORE_msg(key, value, senderID):
+def build_STORE_msg(key, value, sender):
     return { 'operation': 'EXECUTE',
              'method': 'STORE', 'store_key' : key, 'store_value' : value,
-             'sender_id': senderID,
+             'sender': list(sender),
              'key': generate_random_id() }
 
 def generate_random_id():
     return uuid.uuid4().hex
 
-class TimeOutException(Exception):
-    pass
+
+
+# def sendall_to(msg, addr, socket, time_out=5):
+#     sent = 0
+#     start = time.time()
+#     while sent < len(msg) and time.time() - start < time_out:
+#         sent += socket.sendto(msg, addr)
+#     if sent != len(msg):
+#         raise socket.timeout
+
+# def get_answer(expected_key, s:socket.socket, attempts=3):
+
+#     for _ in range(attempts):
+#         data = json.loads(s.recvfrom(1024)[0])
+
+#         if data['key'] == expected_key:
+#             return data
+
+#     raise socket.timeout
+
+def build_xor_table(address_space):
+    xor_table = [[i ^ j for i in range(address_space)] for j in range(address_space)]
+    return xor_table

@@ -3,7 +3,6 @@ import uuid
 import datetime
 import json
 import utils
-from utils import TimeOutException
 import heapq
 import math
 from protocol import Node
@@ -14,27 +13,6 @@ class Peer:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind((node.ip, node.port))
         self.node = node
-
-    def RPC(self, msg, addr):
-        key = utils.generate_random_id()
-        msg['key'] = key
-        msg['sender_id'] = self.node.ID
-
-
-        self.socket.sendto(json.dumps(msg).encode(), addr)
-
-        start = datetime.datetime.now()
-        while (datetime.datetime.now() - start).seconds < 5:
-            answer, _ = self.socket.recvfrom(1024)
-            answer = json.loads(answer)
-
-            if 'method' in answer:
-                continue
-
-            if answer['key'] == key:
-                return answer['result']
-
-        # raise Exception("The remote peer is not responding")
 
     def serve(self):
         print('Peer with ID ' + str(self.node.ID) + " serving on port: " + str(self.node.port))
@@ -47,9 +25,10 @@ class Peer:
         pending_answers = []
 
         while True:
+            # msg, addr = self.socket.recvfrom(1024)
             try:
                 msg, addr = self.socket.recvfrom(1024)
-            except:
+            except socket.timeout:
                 #If a TimeOut Error ocurs, the result of all pending requests is None
                 for pa in pending_answers:
                     key, addr = pa
@@ -77,23 +56,23 @@ class Peer:
 
                 if result is not None:
                     answer = {'operation': 'RESPONSE', 'result': result,
-                             'key': data['key'], 'sender_id': self.node.ID }
+                             'key': data['key'], 'sender': [self.node.ID, self.node.ip, self.node.port] }
                     answer = json.dumps(answer).encode()
                     self.socket.sendto(answer, addr)
-                    self.update(data['sender_id'])
+                    self.update(tuple(data['sender']))
 
             # A peer is requested to perform a RPC to other peer
             if data['operation'] == 'RPC':
                 msg = None
 
                 if data['method'] == 'FIND_NODE':
-                    msg =  utils.build_FIND_NODE_msg(data['id'], self.node.ID)
+                    msg =  utils.build_FIND_NODE_msg(data['id'], self.node)
                 elif data['method'] == 'FIND_VALUE':
-                    msg =  utils.build_FIND_VALUE_msg(data['id'], self.node.ID)
+                    msg =  utils.build_FIND_VALUE_msg(data['id'], self.node)
                 elif data['method'] == 'PING':
-                    msg =  utils.build_PING_msg(self.node.ID)
+                    msg =  utils.build_PING_msg(self.node)
                 elif data['method'] == 'STORE':
-                    msg = utils.build_STORE_msg(data['storeKey'], data['store_value'], self.node.ID)
+                    msg = utils.build_STORE_msg(data['storeKey'], data['store_value'], self.node)
 
                 # Add the answer of the request to the list of pending answers
                 pending_answers.append((msg['key'], addr))
@@ -118,31 +97,44 @@ class Peer:
                         pending_answers.remove(pa)
                         #send the answer to the client
                         self.socket.sendto(json.dumps(data).encode(), pa[1])
-                self.update(data['sender_id'])
+                self.update(data['sender'])
 
-    def update(self, senderID):
+    def update(self, senderNode):
         print("Updating" + str(self.node) + "...")
-        # senderID, senderIp, senderPort = node
-        kBucket = self.node.find_kBucket(senderID)
 
-        if senderID in kBucket:
-            kBucket.remove(senderID)
-            kBucket.append(senderID)
+        senderNode = tuple(senderNode)
+        senderID = senderNode[0]
+
+        #Find the appropiate k-bucket for the sender id
+        kBucket,_ = self.node.find_kBucket(senderID)
+
+        #If the sending node already exists in the k-bucket
+        if senderNode in kBucket:
+            #moves it to the tail of the list
+            kBucket.remove(senderNode)
+            kBucket.append(senderNode)
+
         else:
+            #if the bucket has fewer than k entries, insert it at the tail
             if len(kBucket) < self.node.k:
-                kBucket.append(senderID)
+                kBucket.append(senderNode)
             else:
-                # last_recently_seen node
-                _, lastNodeIp, lastNodePort = kBucket[0]
-                msg = utils.build_PING_msg(self.node.ID)
 
+                # PING the least_recently seen node
+                _, leastNodeIp, leastNodePort = kBucket[0]
+                msg = utils.build_PING_msg(self.node)
+
+                # If exists it is moved to the tail of the list and the sender node is discarded
                 try:
-                    self.RPC(msg, (lastNodeIp, lastNodePort))
+                    print(kBucket[0])
+                    self.socket.sendto(json.dumps(msg).encode(), (leastNodeIp, leastNodePort))
+                    self.socket.recvfrom(1024)
                     kBucket.append(kBucket[0])
                     kBucket.remove(kBucket[0])
-                except:
+                # otherwise it's evicted from the k-bucket and the new node inserted at the tail
+                except socket.timeout:
                     kBucket.remove(kBucket[0])
-                    kBucket.append(senderID)
+                    kBucket.append(senderNode)
         self.node.print_routing_table()
 
     def lookup(self, ID):
@@ -165,7 +157,7 @@ class Peer:
 
                 # k_closest = n[1].FIND_NODE(ID, self.node.k)
                 k_closest = None
-                msg = utils.build_FIND_NODE_msg(ID, self.node.ID)
+                msg = utils.build_FIND_NODE_msg(ID, self.node)
                 try:
                     k_closest = self.RPC(msg, (n[1][0], n[1][2]))
                 except:
@@ -183,6 +175,7 @@ class Peer:
 
             if pending == []:
                 break
+
 
             c = heapq.nsmallest(1, pending)
             if c[0] <= closest_node[0]:
