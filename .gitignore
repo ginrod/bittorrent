@@ -108,3 +108,4 @@ venv.bak/
 *.json
 main.py
 lookup_debug
+

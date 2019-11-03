@@ -58,7 +58,7 @@ class Peer:
                     print(f'Received: {data}')
                     print('*************')
                     result = self.node.STORE(data['store_key'], build_data_to_store(data['store_value']))
-                elif data['method'] == 'LOOKUP':
+                    elif data['method'] == 'LOOKUP':
                     result = self.lookup_value(data["id"])
                 elif data['method'] == 'PUBLISH':
 

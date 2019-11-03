@@ -31,6 +31,17 @@ def dump_json(data, path):
     with open(path, 'w') as json_file:
         json.dump(data, json_file, default=parse_to_json)
 
+def load_json(path):
+    data = {}
+    try:
+        with open(path) as json_file:
+            data = json.load(json_file)
+    except:
+        with open(path, 'w') as json_file:
+            json.dump(data, json_file)
+
+    return data
+
 def build_PING_msg(sender):
     return { 'operation': 'EXECUTE',
              'method': 'PING',
