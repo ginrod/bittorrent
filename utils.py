@@ -1,7 +1,35 @@
 import uuid
 import socket
 import time
-import json
+import json, datetime
+
+def parse_to_json(obj):
+    if isinstance(obj, datetime.datetime):
+        return [obj.year, obj.month, obj.day,
+                obj.hour, obj.minute, obj.second, obj.microsecond]
+
+def parse_from_json(database):
+    print(database)
+    for k in database:
+        database[k]['timeo'] = datetime.datetime(*(database[k]['timeo']))
+        database[k]['timer'] = datetime.datetime(*(database[k]['timer']))
+
+    return database
+
+def load_json(path):
+    data = {}
+    try:
+        with open(path) as json_file:
+            data = parse_from_json(json.load(json_file))
+    except:
+        with open(path, 'w') as json_file:
+            json.dump(data, json_file, default=parse_to_json)
+
+    return data
+
+def dump_json(data, path):
+    with open(path, 'w') as json_file:
+        json.dump(data, json_file, default=parse_to_json)
 
 def build_PING_msg(sender):
     return { 'operation': 'EXECUTE',
@@ -40,15 +68,15 @@ def generate_random_id():
 #     if sent != len(msg):
 #         raise socket.timeout
 
-# def get_answer(expected_key, s:socket.socket, attempts=3):
+def get_answer(expected_key, s:socket.socket, attempts=3):
 
-#     for _ in range(attempts):
-#         data = json.loads(s.recvfrom(1024)[0])
+    for _ in range(attempts):
+        data = json.loads(s.recvfrom(1024)[0])
 
-#         if data['key'] == expected_key:
-#             return data
+        if data['key'] == expected_key:
+            return data
 
-#     raise socket.timeout
+    raise socket.timeout
 
 def build_xor_table(address_space):
     xor_table = [[i ^ j for i in range(address_space)] for j in range(address_space)]

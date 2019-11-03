@@ -1,5 +1,7 @@
 import heapq
 import math
+import json
+import utils
 
 class Node:
 
@@ -11,6 +13,9 @@ class Node:
         self.alpha = alpha
         self.k = k
         self.B = B
+
+        self.storage = f'storage{ID}.json'
+
 
         self.route_table = [[] for _ in range(B)]
 
@@ -42,8 +47,10 @@ class Node:
         return nodes
 
     def find_kBucket(self, senderID):
+
         d = self.distance_to((senderID, ))
-        i = int(math.log2(d))
+
+        i = int(math.log2(d)) if d != 0 else 0
 
         return (self.route_table[i], i)
 
@@ -51,20 +58,34 @@ class Node:
         return self.ID ^ other[0]
 
     def FIND_VALUE(self, ID):
-        pass
+        
+        data = utils.load_json(self.storage)
+        if str(ID) in data:
+            return (True, data[str(ID)])
+        return (False, self.FIND_NODE(ID))
 
     def STORE(self, key, value):
-        pass
+        print(f'*******Value: {value}')
+        key = str(key)
+        data = utils.load_json(self.storage)
+        data[key] = value
+
+        print(f'data to store: {data}')
+        utils.dump_json(data, self.storage)
 
     def PING(self):
         return True
 
     def FIND_NODE(self, ID):
+        return self.get_n_closest(ID, self.k)
+
+
+    def get_n_closest(self, ID, n):
         k_bucket, i = self.find_kBucket(ID)
         heap = []
-        k_closest = [ (ID ^ n[0], n) for n in k_bucket]
+        n_closest = [ (ID ^ n[0], n) for n in heapq.nsmallest(n, k_bucket)]
         inf, sup = i-1,i+1
-        while len(k_closest) < self.k and (inf >=0 or sup < self.B):
+        while len(n_closest) < n and (inf >=0 or sup < self.B):
             if inf >= 0:
                 heap += [(ID ^ n[0], n) for n in self.route_table[inf]]
                 inf -= 1
@@ -72,16 +93,8 @@ class Node:
                 heap += [(ID ^ n[0], n) for n in self.route_table[sup]]
                 sup += 1
 
-            if len(k_closest) + len(heap) >= self.k:
-                for _ in range(self.k - len(k_closest)):
-                    k_closest.append(heapq.heappop(heap))
+            if len(n_closest) + len(heap) >= n:
+                for _ in range(n - len(n_closest)):
+                    n_closest.append(heapq.heappop(heap))
 
-        return [n for _, n in k_closest]
-
-
-
-
-
-
-
-
+        return n_closest
