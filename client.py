@@ -31,7 +31,7 @@ if __name__ == "__main__":
         for arg in input_msg[4:]:
             arg_name, arg_value = tuple(arg.split(':'))
 
-            if arg_name in ['port', 'id']:
+            if arg_name in ['port', 'id', 'store_key']:
                 data[arg_name] = int(arg_value)
             else: data[arg_name] = arg_value
 

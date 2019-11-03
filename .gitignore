@@ -105,3 +105,8 @@ venv.bak/
 
 # input files for testing
 .txt
+
+# JSON
+*.json
+
+main.py

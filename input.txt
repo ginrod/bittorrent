@@ -33,4 +33,5 @@
 
 8006 RPC 8007 PING
 
-8000 EXECUTE 8000 LOOKUP id:7
+8000 EXECUTE 8000 PUBLISH store_key:7 store_value:Mi_primera_publicacion
+8000 EXECUTE -1 LOOKUP id:7

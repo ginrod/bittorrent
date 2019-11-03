@@ -54,11 +54,21 @@ class Peer:
                 elif data['method'] == 'PING':
                     result = self.node.PING()
                 elif data['method'] == 'STORE':
-                    result = self.node.STORE(data['store_key'], data['storeValue'])
+                    print('*************')
+                    print(f'Received: {data}')
+                    print('*************')
+                    result = self.node.STORE(data['store_key'], data['store_value'])
                 elif data['method'] == 'LOOKUP':
-                    print('\n\nID TYPE\n\n')
+                    result = self.lookup_value(data["id"])
+                elif data['method'] == 'PUBLISH':
 
-                    result = self.lookup(data["id"])
+                    k_closest = [n for _, n in self.lookup_node(data['store_key'])]
+                    print(f'k_closest with k = {self.node.k}: {k_closest}')
+                    for node in k_closest:
+                        msg = utils.build_STORE_msg(data['store_key'], data['store_value'], iter(self.node))
+                        print(f'msg: {msg}, destiny: {node}')
+                        self.socket.sendto(json.dumps(msg).encode(), (node[1], node[2]))
+
                 if result is not None:
                     answer = {'operation': 'RESPONSE', 'result': result,
                              'key': data['key'], 'sender': [self.node.ID, self.node.ip, self.node.port] }
@@ -197,8 +207,8 @@ class Peer:
                 break
 
             c = heapq.nsmallest(1, pending)[0][0]
-            print(c)
-            print(closest_node)
+          #  print(c)
+           # print(closest_node)
             top = self.node.alpha if c <= closest_node else self.node.k
             closest_node = min(closest_node, c)
             for _ in range(top):
@@ -212,6 +222,141 @@ class Peer:
         print(f'enquired: {enquired}')
         return heapq.nsmallest(self.node.k, enquired)
 
+    def lookup_node(self, ID):
+        f = open('lookup_debug', 'w')
+        f.write(f'Performing lookup for {ID}\n')
+        f.write(f'First step: getting alpha={self.node.alpha} closest nodes to {ID}\n')
+        to_query = self.node.get_n_closest(ID, self.node.alpha)
+        f.write(f'Result: {to_query}\n')
+
+        pending = []
+        heapq.heapify(pending)
+
+        enquired = []
+
+        closest_node = heapq.nsmallest(1, to_query)[0][0]
+
+        round = 1
+        while True:
+            f.write(f'Round {round} of lookup({self.node}, 7)\n')
+            f.write(f'Nodes to query: {to_query}\n')
+
+            for d,n in to_query:
+
+                # k_closest = n[1].FIND_NODE(ID, self.node.k)
+                f.write(f'Performing FIND_NODE({self.node}, {n})\n')
+                msg = utils.build_FIND_NODE_msg(ID, tuple(iter(self.node)))
+
+                ip, port = n[1], n[2]
+                self.socket.sendto(json.dumps(msg).encode(), (ip, port))
+                k_closest = []
+                try:
+                    data = utils.get_answer(msg['key'], self.socket)
+
+                    k_closest = [(t[0], tuple(t[1])) for t in data['result']]
+                    print(f'AAAAAA: {k_closest}')
+                    f.write(f'Result of FIND_NODE({self.node}, {n}): {k_closest}\n')
+                    self.update(tuple(data['sender']))
+                except socket.timeout:
+                    f.write(f'Timeout during FIND_NODE({self.node}, {n})\n')
+                    pass
+
+                if (d,n) not in enquired:
+                    enquired.append((d, n))
+
+                for t in k_closest:
+                    if not t in enquired and not t in to_query and not t in pending:
+                        pending.append(t)
+
+            to_query.clear()
+
+            if pending == []:
+                break
+
+            c = heapq.nsmallest(1, pending)[0][0]
+           # print(c)
+            #print(closest_node)
+            top = self.node.alpha if c <= closest_node else self.node.k
+            closest_node = min(closest_node, c)
+            for _ in range(top):
+                try:
+                    to_query.append(heapq.heappop(pending))
+                except:
+                    break
+            f.write(f'Results after round #{round}: {enquired}\n')
+            round += 1
+
+        #print(f'enquired: {enquired}')
+        return heapq.nsmallest(self.node.k, enquired)
+
+
+    def lookup_value(self, ID):
+        f = open('lookup_debug', 'w')
+        f.write(f'Performing lookup for {ID}\n')
+        f.write(f'First step: getting alpha={self.node.alpha} closest nodes to {ID}\n')
+        to_query = self.node.get_n_closest(ID, self.node.alpha)
+        f.write(f'Result: {to_query}\n')
+
+        pending = []
+        heapq.heapify(pending)
+
+        enquired = []
+
+        closest_node = heapq.nsmallest(1, to_query)[0][0]
+
+        round = 1
+        while True:
+            f.write(f'Round {round} of lookup({self.node}, 7)\n')
+            f.write(f'Nodes to query: {to_query}\n')
+
+            for d,n in to_query:
+
+                # k_closest = n[1].FIND_NODE(ID, self.node.k)
+                f.write(f'Performing FIND_VALUE({self.node}, {n})\n')
+                msg = utils.build_FIND_VALUE_msg(ID, tuple(iter(self.node)))
+
+                ip, port = n[1], n[2]
+                self.socket.sendto(json.dumps(msg).encode(), (ip, port))
+                k_closest = []
+                try:
+                    data = utils.get_answer(msg['key'], self.socket)
+                    if data['result'][0]:
+                        return data['result']
+                    k_closest = [(t[0], tuple(t[1])) for t in data['result'][1]]
+
+                    f.write(f'Result of FIND_NODE({self.node}, {n}): {k_closest}\n')
+                    self.update(tuple(data['sender']))
+                except socket.timeout:
+                    f.write(f'Timeout during FIND_NODE({self.node}, {n})\n')
+                    pass
+
+                if (d,n) not in enquired:
+                    enquired.append((d, n))
+
+                for t in k_closest:
+                    if not t in enquired and not t in to_query and not t in pending:
+                        pending.append(t)
+
+            to_query.clear()
+
+            if pending == []:
+                break
+
+            c = heapq.nsmallest(1, pending)[0][0]
+            print(c)
+            print(closest_node)
+            top = self.node.alpha if c <= closest_node else self.node.k
+            closest_node = min(closest_node, c)
+            for _ in range(top):
+                try:
+                    to_query.append(heapq.heappop(pending))
+                except:
+                    break
+            f.write(f'Results after round #{round}: {enquired}\n')
+            round += 1
+
+        print(f'enquired: {enquired}')
+        return (False, heapq.nsmallest(self.node.k, enquired))
 
 if __name__ == '__main__':
     import argparse

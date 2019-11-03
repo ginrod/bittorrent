@@ -1,5 +1,7 @@
 import heapq
 import math
+import json
+import utils
 
 class Node:
 
@@ -11,6 +13,9 @@ class Node:
         self.alpha = alpha
         self.k = k
         self.B = B
+
+        self.storage = f'storage{ID}.json'
+
 
         self.route_table = [[] for _ in range(B)]
 
@@ -53,10 +58,20 @@ class Node:
         return self.ID ^ other[0]
 
     def FIND_VALUE(self, ID):
-        pass
+        
+        data = utils.load_json(self.storage)
+        if str(ID) in data:
+            return (True, data[str(ID)])
+        return (False, self.FIND_NODE(ID))
 
     def STORE(self, key, value):
-        pass
+        print(f'*******Value: {value}')
+        key = str(key)
+        data = utils.load_json(self.storage)
+        data[key] = value
+        print(f'data to store: {data}')
+        with open(self.storage, 'w') as json_file:
+            json.dump(data, json_file)
 
     def PING(self):
         return True
