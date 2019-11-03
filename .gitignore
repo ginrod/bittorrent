@@ -107,3 +107,4 @@ venv.bak/
 *.txt
 *.json
 main.py
+lookup_debug
