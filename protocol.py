@@ -42,8 +42,10 @@ class Node:
         return nodes
 
     def find_kBucket(self, senderID):
+
         d = self.distance_to((senderID, ))
-        i = int(math.log2(d))
+
+        i = int(math.log2(d)) if d != 0 else 0
 
         return (self.route_table[i], i)
 
@@ -66,7 +68,7 @@ class Node:
     def get_n_closest(self, ID, n):
         k_bucket, i = self.find_kBucket(ID)
         heap = []
-        n_closest = [ (ID ^ n[0], n) for n in k_bucket]
+        n_closest = [ (ID ^ n[0], n) for n in heapq.nsmallest(n, k_bucket)]
         inf, sup = i-1,i+1
         while len(n_closest) < n and (inf >=0 or sup < self.B):
             if inf >= 0:
@@ -80,4 +82,4 @@ class Node:
                 for _ in range(n - len(n_closest)):
                     n_closest.append(heapq.heappop(heap))
 
-        return [node for _, node in n_closest]
+        return n_closest

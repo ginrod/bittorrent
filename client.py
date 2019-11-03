@@ -15,22 +15,28 @@ if __name__ == "__main__":
     reader = open('input.txt', 'r')
     commands = reader.readlines()
 
-    while True:
-    # for command in commands:
-        # input_msg = command.split()
+    # while True:
+    for command in commands:
+        input_msg = command.split()
+
+        if input_msg == []:
+            continue
+
         # print(input_msg)
-        # input_msg = input_msg[0:-1] if input_msg[-1] == '\n' else input_msg
-        input_msg = input("[PORT] [OPERATION] [OP_PORT] [METHOD] [ARGS...]\n").split()
+        input_msg = input_msg[0:-1] if input_msg[-1] == '\n' else input_msg
+        # input_msg = input("[PORT] [OPERATION] [OP_PORT] [METHOD] [ARGS...]\n").split()
 
         addr = 'localhost', int(input_msg[0])
         data = {'operation': input_msg[1], 'method': input_msg[3], 'ip': 'localhost', 'port': int(input_msg[2])}
         for arg in input_msg[4:]:
             arg_name, arg_value = tuple(arg.split(':'))
 
-            if arg_name in ['port', 'ID']:
-                data[arg_value] = int(arg_value)
+            if arg_name in ['port', 'id']:
+                data[arg_name] = int(arg_value)
             else: data[arg_name] = arg_value
 
+        import utils
+        data['key'] = utils.generate_random_id()
         print("data to send to " + str(addr[0])+ ":" + str(addr[1]) + "\n" + str(data))
         s.sendto(json.dumps(data).encode(), addr)
 
@@ -43,7 +49,7 @@ if __name__ == "__main__":
             continue
 
 
-        print("Answer from RPC executded from address " + str(addr[0]) + ":" + str(addr[1]) + "is " + str(data['result']))
+        print("Answer from RPC executded from address " + str(addr[0]) + ":" + str(addr[1]) + " is " + str(data['result']))
 
     reader.close()
 
