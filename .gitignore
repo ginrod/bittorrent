@@ -104,4 +104,6 @@ venv.bak/
 .mypy_cache/
 
 # input files for testing
-.txt
+*.txt
+*.json
+main.py
