@@ -7,6 +7,8 @@ import heapq
 import math
 from protocol import Node
 
+import sys
+
 class Peer:
 
     def __init__(self, node):
@@ -53,13 +55,17 @@ class Peer:
                     result = self.node.PING()
                 elif data['method'] == 'STORE':
                     result = self.node.STORE(data['store_key'], data['storeValue'])
+                elif data['method'] == 'LOOKUP':
+                    print('\n\nID TYPE\n\n')
 
+                    result = self.lookup(data["id"])
                 if result is not None:
                     answer = {'operation': 'RESPONSE', 'result': result,
                              'key': data['key'], 'sender': [self.node.ID, self.node.ip, self.node.port] }
                     answer = json.dumps(answer).encode()
                     self.socket.sendto(answer, addr)
-                    self.update(tuple(data['sender']))
+                    if 'sender' in data:
+                        self.update(tuple(data['sender']))
 
             # A peer is requested to perform a RPC to other peer
             if data['operation'] == 'RPC':
@@ -99,6 +105,8 @@ class Peer:
                         self.socket.sendto(json.dumps(data).encode(), pa[1])
                 self.update(data['sender'])
 
+        self.node.print_routing_table()
+
     def update(self, senderNode):
         print("Updating" + str(self.node) + "...")
 
@@ -128,7 +136,7 @@ class Peer:
                 try:
                     print(kBucket[0])
                     self.socket.sendto(json.dumps(msg).encode(), (leastNodeIp, leastNodePort))
-                    self.socket.recvfrom(1024)
+                    utils.get_answer(msg['key'], self.socket)
                     kBucket.append(kBucket[0])
                     kBucket.remove(kBucket[0])
                 # otherwise it's evicted from the k-bucket and the new node inserted at the tail
@@ -138,37 +146,49 @@ class Peer:
         self.node.print_routing_table()
 
     def lookup(self, ID):
-        #Insert all nodes of the k-bucket list of start on a list
-        nodes = self.node.get_all_nodes(ID)
-
-        #Select the alpha closest nodes to ID
-        to_query = heapq.nsmallest(self.node.alpha, nodes)
+        f = open('lookup_debug', 'w')
+        f.write(f'Performing lookup for {ID}\n')
+        f.write(f'First step: getting alpha={self.node.alpha} closest nodes to {ID}\n')
+        to_query = self.node.get_n_closest(ID, self.node.alpha)
+        f.write(f'Result: {to_query}\n')
 
         pending = []
         heapq.heapify(pending)
 
         enquired = []
 
-        closest_node = heapq.nsmallest(1, to_query)
+        closest_node = heapq.nsmallest(1, to_query)[0][0]
 
+        round = 1
         while True:
+            f.write(f'Round {round} of lookup({self.node}, 7)\n')
+            f.write(f'Nodes to query: {to_query}\n')
 
-            for n in to_query:
+            for d,n in to_query:
 
                 # k_closest = n[1].FIND_NODE(ID, self.node.k)
-                k_closest = None
-                msg = utils.build_FIND_NODE_msg(ID, self.node)
+                f.write(f'Performing FIND_NODE({self.node}, {n})\n')
+                msg = utils.build_FIND_NODE_msg(ID, tuple(iter(self.node)))
+
+                ip, port = n[1], n[2]
+                self.socket.sendto(json.dumps(msg).encode(), (ip, port))
+                k_closest = []
                 try:
-                    k_closest = self.RPC(msg, (n[1][0], n[1][2]))
-                except:
-                    # What to do if the RPC doesn't work
+                    data = utils.get_answer(msg['key'], self.socket)
+
+                    k_closest = [(t[0], tuple(t[1])) for t in data['result']]
+                    print(f'AAAAAA: {k_closest}')
+                    f.write(f'Result of FIND_NODE({self.node}, {n}): {k_closest}\n')
+                    self.update(tuple(data['sender']))
+                except socket.timeout:
+                    f.write(f'Timeout during FIND_NODE({self.node}, {n})\n')
                     pass
 
-                enquired.append(n)
-
+                if (d,n) not in enquired:
+                    enquired.append((d, n))
 
                 for t in k_closest:
-                    if not t in enquired and not t in to_query:
+                    if not t in enquired and not t in to_query and not t in pending:
                         pending.append(t)
 
             to_query.clear()
@@ -176,22 +196,20 @@ class Peer:
             if pending == []:
                 break
 
+            c = heapq.nsmallest(1, pending)[0][0]
+            print(c)
+            print(closest_node)
+            top = self.node.alpha if c <= closest_node else self.node.k
+            closest_node = min(closest_node, c)
+            for _ in range(top):
+                try:
+                    to_query.append(heapq.heappop(pending))
+                except:
+                    break
+            f.write(f'Results after round #{round}: {enquired}\n')
+            round += 1
 
-            c = heapq.nsmallest(1, pending)
-            if c[0] <= closest_node[0]:
-                closest_node = c
-                for _ in range(self.node.alpha):
-                    try:
-                        to_query.append(heapq.heappop(pending))
-                    except:
-                        break
-            else:
-                for _ in range(self.node.k):
-                    try:
-                        to_query.append(heapq.heappop(pending))
-                    except:
-                        break
-
+        print(f'enquired: {enquired}')
         return heapq.nsmallest(self.node.k, enquired)
 
 
@@ -204,6 +222,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     ID = args.id
-    node = Node(ID, '127.0.0.1', args.port, B=3, k=2)
+    node = Node(ID, '127.0.0.1', args.port, B=3, k=3, alpha=2)
     peer = Peer(node)
     peer.serve()
