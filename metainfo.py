@@ -14,3 +14,9 @@ def generate_pieces(_file, piece_length):
             break
         pieces.append(generate_hash(piece, hashlib.sha1))
     return pieces
+
+def concat_pieces(pieces):
+    result = ""
+    for piece in pieces:
+        result += str(piece)
+    return result
