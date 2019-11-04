@@ -57,7 +57,7 @@ class Peer:
                     print('*************')
                     print(f'Received: {data}')
                     print('*************')
-                    result = self.node.STORE(data['store_key'], data['store_value'])
+                    result = self.node.STORE(data['store_key'], build_data_to_store(data['store_value']))
                 elif data['method'] == 'LOOKUP':
                     result = self.lookup_value(data["id"])
                 elif data['method'] == 'PUBLISH':
@@ -116,6 +116,14 @@ class Peer:
                 self.update(data['sender'])
 
         self.node.print_routing_table()
+
+    
+    def check_database(self):
+        # {"7": ["Mi_primera_publicacion", timeo, ipo, porto, timer]}
+        import time
+
+        while True:
+            pass
 
     def update(self, senderNode):
         print("Updating" + str(self.node) + "...")

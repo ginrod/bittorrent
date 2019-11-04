@@ -69,9 +69,9 @@ class Node:
         key = str(key)
         data = utils.load_json(self.storage)
         data[key] = value
+
         print(f'data to store: {data}')
-        with open(self.storage, 'w') as json_file:
-            json.dump(data, json_file)
+        utils.dump_json(data, self.storage)
 
     def PING(self):
         return True
