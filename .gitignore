@@ -109,3 +109,5 @@ venv.bak/
 main.py
 lookup_debug
 
+# ignoring the complete directory
+files/
