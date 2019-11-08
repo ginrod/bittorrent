@@ -1,18 +1,38 @@
 import uuid
 import socket
 import time
-import json
+import json, datetime
+
+def parse_to_json(obj):
+    if isinstance(obj, datetime.datetime):
+        return [obj.year, obj.month, obj.day,
+                obj.hour, obj.minute, obj.second, obj.microsecond]
+
+def parse_from_json(database):
+    print(database)
+    for k in database:
+        database[k]['timeo'] = datetime.datetime(*(database[k]['timeo']))
+        database[k]['timer'] = datetime.datetime(*(database[k]['timer']))
+
+    return database
+
 
 def load_json(path):
     data = {}
     try:
         with open(path) as json_file:
-            data = json.load(json_file)
+            data = parse_from_json(json.load(json_file))
     except:
         with open(path, 'w') as json_file:
-            json.dump(data, json_file)
+            json.dump(data, json_file, default=parse_to_json)
 
     return data
+
+def dump_json(data, path):
+    with open(path, 'w') as json_file:
+        json.dump(data, json_file, default=parse_to_json)
+
+
 
 def build_PING_msg(sender):
     return { 'operation': 'EXECUTE',
