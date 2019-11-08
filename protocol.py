@@ -58,7 +58,7 @@ class Node:
         return self.ID ^ other[0]
 
     def FIND_VALUE(self, ID):
-        
+
         data = utils.load_json(self.storage)
         if str(ID) in data:
             return (True, data[str(ID)])

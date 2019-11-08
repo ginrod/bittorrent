@@ -57,9 +57,11 @@ class Peer:
                     print('*************')
                     print(f'Received: {data}')
                     print('*************')
-                    result = self.node.STORE(data['store_key'], build_data_to_store(data['store_value']))
+                    result = self.node.STORE(data['store_key'], self.build_data_to_store(data['store_key'], data['store_value']))
+
                 elif data['method'] == 'LOOKUP':
                     result = self.lookup_value(data["id"])
+
                 elif data['method'] == 'PUBLISH':
 
                     k_closest = [n for _, n in self.lookup_node(data['store_key'])]
@@ -117,7 +119,11 @@ class Peer:
 
         self.node.print_routing_table()
 
-    
+
+    def build_data_to_store(self, store_key, store_value):
+        data = { 'value' : store_value }
+
+
     def check_database(self):
         # {"7": ["Mi_primera_publicacion", timeo, ipo, porto, timer]}
         import time

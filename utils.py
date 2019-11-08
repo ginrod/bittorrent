@@ -16,6 +16,7 @@ def parse_from_json(database):
 
     return database
 
+
 def load_json(path):
     data = {}
     try:
@@ -30,6 +31,8 @@ def load_json(path):
 def dump_json(data, path):
     with open(path, 'w') as json_file:
         json.dump(data, json_file, default=parse_to_json)
+
+
 
 def build_PING_msg(sender):
     return { 'operation': 'EXECUTE',
