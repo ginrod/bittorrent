@@ -83,9 +83,6 @@ def dump_json(data, path):
     with open(path, 'w') as json_file:
         json.dump(data, json_file, default=parse_to_json)
 
-def dumps_json(data):
-    return json.dumps(data, default=parse_to_json)
-
 def build_PING_msg(sender):
     return {'operation': 'EXECUTE',
             'method': 'PING',

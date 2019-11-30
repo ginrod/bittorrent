@@ -109,3 +109,9 @@ venv.bak/
 main.py
 lookup_debug
 
+# Directories
+.vscode/
+downloaded
+files
+testing.py
+
