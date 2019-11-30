@@ -1,140 +1,259 @@
 import socket
 import uuid
-import datetime
+import datetime, time
 import json
 import utils
 import heapq
 import math
 from protocol import Node
+import threading, random
+from database import Database
 
 import sys
 
-class Peer:
+INDEX_KEY = 10
 
-    def __init__(self, node):
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.socket.bind((node.ip, node.port))
+class Peer:
+    
+    def __init__(self, node, tcp_server_port=9000):
+        self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.udp_socket.bind((node.ip, node.port))
+        
+        self.lock = threading.Lock()
         self.node = node
+        self.reponses = {}
+        self.tcp_server_port = tcp_server_port
+
+        self.tcp_server = socket.socket()
+        self.tcp_server.bind((node.ip, tcp_server_port))
+        self.tcp_server.listen(256)
+
+        self.tcp_client = socket.socket()
+
+        now = datetime.datetime.now()
+        self.kBucketRefreshTimes = [now] * len(node.route_table)
+        self.received_msgs = set()
+
+        utils.create_dirs('files/storage/files')
+        self.recvfile_lock = threading.Lock()
 
     def serve(self):
-        print('Peer with ID ' + str(self.node.ID) + " serving on port: " + str(self.node.port))
+        print('Peer with ID ' + str(self.node.ID) + " serving at : " +  str(self.node.ip) + ":" + str(self.node.port))
 
-        #If the peer doesn't receive a response after five seconds to it's request it desists of waiting for it
-        self.socket.settimeout(5)
-
-        #A list of requests the peer has sent but doesn't have received a response yet.
-        #Every element has the structure key, address()
-        pending_answers = []
-
-        while True:
-            # msg, addr = self.socket.recvfrom(1024)
-            try:
-                msg, addr = self.socket.recvfrom(1024)
-            except socket.timeout:
-                #If a TimeOut Error ocurs, the result of all pending requests is None
-                for pa in pending_answers:
-                    key, addr = pa
-                    answer = {'operation': 'RESPONSE', 'result': None, 'key': key}
-                    self.socket.sendto(json.dumps(answer).encode(), addr)
-                pending_answers.clear()
-
-                continue
-
-
-            data = json.loads(msg)
-            print("Data received: " + str(data))
-
-            # A peer has to perform a method specified by other peer by RPC
-            if data['operation'] == 'EXECUTE':
-                result = None
-                if data['method'] == 'FIND_NODE':
-                    result =  self.node.FIND_NODE(data['id'])
-                elif data['method'] == 'FIND_VALUE':
-                    result = self.node.FIND_VALUE(data['id'])
-                elif data['method'] == 'PING':
-                    result = self.node.PING()
-                elif data['method'] == 'STORE':
-                    print('*************')
-                    print(f'Received: {data}')
-                    print('*************')
-                    result = self.node.STORE(data['store_key'], build_data_to_store(data['store_value']))
-                    elif data['method'] == 'LOOKUP':
-                    result = self.lookup_value(data["id"])
-                elif data['method'] == 'PUBLISH':
-
-                    k_closest = [n for _, n in self.lookup_node(data['store_key'])]
-                    print(f'k_closest with k = {self.node.k}: {k_closest}')
-                    for node in k_closest:
-                        msg = utils.build_STORE_msg(data['store_key'], data['store_value'], iter(self.node))
-                        print(f'msg: {msg}, destiny: {node}')
-                        self.socket.sendto(json.dumps(msg).encode(), (node[1], node[2]))
-
-                if result is not None:
-                    answer = {'operation': 'RESPONSE', 'result': result,
-                             'key': data['key'], 'sender': [self.node.ID, self.node.ip, self.node.port] }
-                    answer = json.dumps(answer).encode()
-                    self.socket.sendto(answer, addr)
-                    if 'sender' in data:
-                        self.update(tuple(data['sender']))
-
-            # A peer is requested to perform a RPC to other peer
-            if data['operation'] == 'RPC':
-                msg = None
-
-                if data['method'] == 'FIND_NODE':
-                    msg =  utils.build_FIND_NODE_msg(data['id'], self.node)
-                elif data['method'] == 'FIND_VALUE':
-                    msg =  utils.build_FIND_VALUE_msg(data['id'], self.node)
-                elif data['method'] == 'PING':
-                    msg =  utils.build_PING_msg(self.node)
-                elif data['method'] == 'STORE':
-                    msg = utils.build_STORE_msg(data['storeKey'], data['store_value'], self.node)
-
-                # Add the answer of the request to the list of pending answers
-                pending_answers.append((msg['key'], addr))
+        try:
+            while True:
+                # msg, _ = self.receive_from()
+                msg, _ = self.udp_socket.recvfrom(1024)
 
                 if msg is not None:
-                    # The address of the remote peer wich it will be used as the target of the RPC
-                    addr = (data['ip'], data['port'])
+                    data = json.loads(msg)
+                    
+                    if data['key'] in self.received_msgs:
+                        continue
+                    else:
+                        self.received_msgs.add(data['key'])
 
-                    msg = json.dumps(msg).encode()
-                    print("Attempting to send data to: " + str(addr))
-                    print("Data to send: " + str(msg))
+                    addr = data['sender'][1], data['sender'][2]
+                    threading._start_new_thread(self.proccess_message, (data, addr))
+                
+                self.node.print_routing_table()
+        except KeyboardInterrupt:
+            self.__del__()
 
-                    self.socket.sendto(msg, addr)
-                    print("RPC done to: " + str(addr))
+    def proccess_message(self, data, addr):
+        # data = json.loads(msg)
+        if data['operation'] != 'DISCOVER':
+            print("Data received: " + str(data))
 
-            # The peer receives the answer of a RPC made before
-            if data['operation'] == 'RESPONSE':
-                #Look for the key of the request in the pending answers
-                for pa in pending_answers:
-                    if pa[0] == data['key']:
-                        #remove it
-                        pending_answers.remove(pa)
-                        #send the answer to the client
-                        self.socket.sendto(json.dumps(data).encode(), pa[1])
+        if data['operation'] == 'DISCOVER': 
+            if data['join']:
+                # addr = str(data['sender'][1]), int(data['sender'][2])
+                if addr != (self.node.ip, self.node.port):
+                    answer = { 'operation': 'CONTACT', 'sender': list(self.node),
+                            'key': data['key'] }
+                    
+                    self.send_udp_msg(json.dumps(answer).encode(), addr)
+                    self.update(tuple(data['sender']))
+            else:
+                if addr != (self.node.ip, self.node.port):
+                    ip, port = str(data['ip']), int(data['port'])
+                    server_addr = (self.node.ip, self.tcp_server_port)
+                    try: self.sendall(server_addr, ip, port)
+                    except: pass
+
+        elif data['operation'] == 'CONTACT':
+            contact = tuple(data['sender'])
+            self.update(contact)
+            threading._start_new_thread(self.lookup_node, (self.node.ID, ))    
+
+        # A peer has to perform a method specified by other peer by RPC
+        elif data['operation'] == 'EXECUTE':
+            result = None
+            if data['method'] == 'FIND_NODE':
+                result =  self.node.FIND_NODE(data['id'])
+            elif data['method'] == 'FIND_VALUE':
+                result = self.node.FIND_VALUE(data['id'])
+                answer = {'operation': 'RESPONSE', 'result': result,
+                            'key': data['key'], 'sender': [self.node.ID, self.node.ip, self.node.port] }
+                self.sendall(answer, addr[1])
+                if 'sender' in data: self.update(tuple(data['sender']))
+                return
+
+            elif data['method'] == 'PING':
+                result = self.node.PING()
+            elif data['method'] == 'STORE':
+                key, value = data['store_key'], data['store_value']
+                publisher, sender = tuple(data['publisher']), tuple(data['sender'])
+                result = self.node.STORE(key, value, publisher, sender)
+            elif data['method'] == 'LOOKUP':
+                result = self.lookup_value(data["id"])
+            elif data['method'] == 'PUBLISH':
+                node = self.node.asTuple()
+                self.publish(data, node, node)
+
+            if result is not None:
+                answer = {'operation': 'RESPONSE', 'result': result,
+                            'key': data['key'], 'sender': [self.node.ID, self.node.ip, self.node.port] }
+                answer = json.dumps(answer).encode()
+                self.send_udp_msg(answer, addr)
+
+
+                if 'sender' in data:
+                    self.update(tuple(data['sender']))
+
+        # A peer is requested to perform a RPC to other peer
+        elif data['operation'] == 'RPC':
+            msg = None
+
+            if data['method'] == 'FIND_NODE':
+                msg =  utils.build_FIND_NODE_msg(data['id'], self.node)
+            elif data['method'] == 'FIND_VALUE':
+                msg =  utils.build_FIND_VALUE_msg(data['id'], self.node)
+            elif data['method'] == 'PING':
+                msg =  utils.build_PING_msg(self.node)
+            elif data['method'] == 'STORE':
+                msg = utils.build_STORE_msg(data['storeKey'], data['store_value'], self.node, self.node)
+
+            if msg is not None:
+                # The address of the remote peer wich it will be used as the target of the RPC
+                addr = (data['ip'], data['port'])
+                msg = json.dumps(msg).encode()
+                self.send_udp_msg(msg, addr)
+
+
+        # The peer receives the answer of a RPC made before
+        elif data['operation'] == 'RESPONSE':
+            self.set_response(data['key'], data)
+            if not Node.Equals(data['sender'], self.node):
                 self.update(data['sender'])
 
-        self.node.print_routing_table()
+    def publish(self, data, publisher, sender):
+        if data['value_type'] == 'file':
+            file_bytes = self.recv_file()
 
-    def build_data_to_store(store_key, store_value):
-        data = { 'value' : store_value }
+        k_closest = [n for _, n in self.lookup_node(data['store_key'])]
+        for node in k_closest:
+            if data['to_update']:
+                self._update(data['store_key'], data['store_value'], publisher, sender)
+                continue
 
-    def check_database(self):
-        # {"7": ["Mi_primera_publicacion", timeo, ipo, porto, timer]}
-        import time
+            msg = utils.build_STORE_msg(data['store_key'], data['store_value'], publisher, sender, data['value_type'])
+            self.sendall(msg, node[1])
+            if data['value_type'] == 'file':
+                threading._start_new_thread(self._send_file, (file_bytes, node[1]))
+        
+        return k_closest
+
+    def _send_file(self, file_bytes, ip):
+        try:
+            sock = socket.socket()
+            sock.connect((ip, 9090))
+            sock.sendall(file_bytes)
+            sock.close()
+        except ConnectionRefusedError: pass
+
+    def _close_socket(self, sock):
+        try:
+            sock.close()
+            sock.shutdown(socket.SHUT_WR)
+        except: pass
+
+    def _lookup_and_update(self, ID):
+        k_closest = [n for _, n in self.lookup_node(ID)]
+        for n in k_closest: self.update(n)
+
+    def refresh_kbuckets(self):
+        copyTimes = list(self.kBucketRefreshTimes)
+        for i, kBucketRefreshTime in enumerate(copyTimes):
+            if datetime.datetime.now() - kBucketRefreshTime >= datetime.timedelta(seconds=10):
+            # if datetime.datetime.now() - kBucketRefreshTime >= datetime.timedelta(seconds=1):
+            # if datetime.datetime.now() - kBucketRefreshTime >= datetime.timedelta(hours=1):
+                routing_table = self.node.route_table
+                kBucket = routing_table[i]
+
+                if len(kBucket) == 0:
+                    continue
+
+                rand_idx = random.randrange(0, len(kBucket))
+                rand_ID = kBucket[rand_idx][0]
+                now = datetime.datetime.now()
+                threading._start_new_thread(self._update_kbucket_time, (rand_idx, now))
+                threading._start_new_thread(self._lookup_and_update, (rand_ID,))
+
+    def republish_data(self):
+        # !EYE!
+        # For manual testing lets consider 1 hour as 10 seconds,
+        # the 24 hours are 240 seconds (4 minutes)
+        # For unit testing consider 1 hour as 1 second
+
+        my_local_database = utils.load_json(self.node.storage)
+        keys_to_drop = set()
+        
+        # database = Database(self.node.ip, 5050, contact=(self.node.ip, self.tcp_server_port)) 
+        database = Database(self.node.ip, 5050, contact=(self.node.ip, 9000)) 
+        for key, data in my_local_database.items():
+            original_republish = True if datetime.datetime.now() - data['timeo'] < datetime.timedelta(seconds=240) else False
+            # original_republish = True if datetime.datetime.now() - data['timeo'] < datetime.timedelta(seconds=24) else False
+            # original_republish = True if datetime.datetime.now() - data['timeo'] < datetime.timedelta(days=1) else False
+
+            if not original_republish:
+                # database.pop(key)
+                # keys_to_drop.add(key)
+                # continue
+                pass
+
+            if datetime.datetime.now() - data['timer'] >= datetime.timedelta(seconds=10):
+            # if datetime.datetime.now() - data['timer'] >= datetime.timedelta(seconds=1):
+            # if datetime.datetime.now() - data['timer'] >= datetime.timedelta(hours=1):
+
+                # Republishing
+                # self.publish(data, data['publisher'], self.node.asTuple())
+                data = utils.build_STORE_msg(key, data['value'], data['publisher'], self.node.asTuple(), value_type=data['value_type'])
+                k_closest = self.publish(data, data['publisher'], self.node.asTuple())
+                if self.node.asTuple() not in k_closest:
+                    keys_to_drop.add(key)
+                # if data['value_type']
+
+        # for key in keys_to_drop:
+        #     my_local_database.pop(key)
+        
+        # utils.dump_json(my_local_database, self.node.storage)
+        self.node.store_lock.acquire(True)
+
+
+    def check_network(self, time_unit=1):
 
         while True:
-            pass
+            self.refresh_kbuckets()
+            self.republish_data()
+            time.sleep(time_unit)
 
     def update(self, senderNode):
-        print("Updating" + str(self.node) + "...")
-
         senderNode = tuple(senderNode)
         senderID = senderNode[0]
 
         #Find the appropiate k-bucket for the sender id
-        kBucket,_ = self.node.find_kBucket(senderID)
+        kBucket, idx = self.node.find_kBucket(senderID)
 
         #If the sending node already exists in the k-bucket
         if senderNode in kBucket:
@@ -154,125 +273,68 @@ class Peer:
 
                 # If exists it is moved to the tail of the list and the sender node is discarded
                 try:
-                    print(kBucket[0])
-                    self.socket.sendto(json.dumps(msg).encode(), (leastNodeIp, leastNodePort))
-                    utils.get_answer(msg['key'], self.socket)
+                    # print(kBucket[0])
+                    self.send_udp_msg(json.dumps(msg).encode(), (leastNodeIp, leastNodePort))
+
+                    # self.get_answer(msg['key'])
+                    self.get_response(msg['key'])
                     kBucket.append(kBucket[0])
                     kBucket.remove(kBucket[0])
                 # otherwise it's evicted from the k-bucket and the new node inserted at the tail
                 except socket.timeout:
                     kBucket.remove(kBucket[0])
                     kBucket.append(senderNode)
+
+        now = datetime.datetime.now()
+        threading._start_new_thread(self._update_kbucket_time, (idx, now))
         self.node.print_routing_table()
 
-    def lookup(self, ID):
-        f = open('lookup_debug', 'w')
-        f.write(f'Performing lookup for {ID}\n')
-        f.write(f'First step: getting alpha={self.node.alpha} closest nodes to {ID}\n')
-        to_query = self.node.get_n_closest(ID, self.node.alpha)
-        f.write(f'Result: {to_query}\n')
-
-        pending = []
-        heapq.heapify(pending)
-
-        enquired = []
-
-        closest_node = heapq.nsmallest(1, to_query)[0][0]
-
-        round = 1
-        while True:
-            f.write(f'Round {round} of lookup({self.node}, 7)\n')
-            f.write(f'Nodes to query: {to_query}\n')
-
-            for d,n in to_query:
-
-                # k_closest = n[1].FIND_NODE(ID, self.node.k)
-                f.write(f'Performing FIND_NODE({self.node}, {n})\n')
-                msg = utils.build_FIND_NODE_msg(ID, tuple(iter(self.node)))
-
-                ip, port = n[1], n[2]
-                self.socket.sendto(json.dumps(msg).encode(), (ip, port))
-                k_closest = []
-                try:
-                    data = utils.get_answer(msg['key'], self.socket)
-
-                    k_closest = [(t[0], tuple(t[1])) for t in data['result']]
-                    print(f'AAAAAA: {k_closest}')
-                    f.write(f'Result of FIND_NODE({self.node}, {n}): {k_closest}\n')
-                    self.update(tuple(data['sender']))
-                except socket.timeout:
-                    f.write(f'Timeout during FIND_NODE({self.node}, {n})\n')
-                    pass
-
-                if (d,n) not in enquired:
-                    enquired.append((d, n))
-
-                for t in k_closest:
-                    if not t in enquired and not t in to_query and not t in pending:
-                        pending.append(t)
-
-            to_query.clear()
-
-            if pending == []:
-                break
-
-            c = heapq.nsmallest(1, pending)[0][0]
-          #  print(c)
-           # print(closest_node)
-            top = self.node.alpha if c <= closest_node else self.node.k
-            closest_node = min(closest_node, c)
-            for _ in range(top):
-                try:
-                    to_query.append(heapq.heappop(pending))
-                except:
-                    break
-            f.write(f'Results after round #{round}: {enquired}\n')
-            round += 1
-
-        print(f'enquired: {enquired}')
-        return heapq.nsmallest(self.node.k, enquired)
+    def _update_kbucket_time(self, idx, t):
+        if self.kBucketRefreshTimes[idx] >= t: return
+        self.lock.acquire()
+        if self.kBucketRefreshTimes[idx] >= t: return
+        self.kBucketRefreshTimes[idx] = t
+        self.lock.release()            
 
     def lookup_node(self, ID):
-        f = open('lookup_debug', 'w')
-        f.write(f'Performing lookup for {ID}\n')
-        f.write(f'First step: getting alpha={self.node.alpha} closest nodes to {ID}\n')
         to_query = self.node.get_n_closest(ID, self.node.alpha)
-        f.write(f'Result: {to_query}\n')
 
         pending = []
         heapq.heapify(pending)
 
-        enquired = []
+        myinfo = (self.node.ID ^ ID, self.node.asTuple())
+        enquired = [myinfo]
+        alives = [myinfo]
+
+        if len(to_query) == 0:
+            return [(self.node.ID ^ ID, self.node.asTuple())]
+            # return []
 
         closest_node = heapq.nsmallest(1, to_query)[0][0]
 
         round = 1
         while True:
-            f.write(f'Round {round} of lookup({self.node}, 7)\n')
-            f.write(f'Nodes to query: {to_query}\n')
 
             for d,n in to_query:
+                k_closest, data = [], None
+                if not Node.Equals(n, self.node):
 
-                # k_closest = n[1].FIND_NODE(ID, self.node.k)
-                f.write(f'Performing FIND_NODE({self.node}, {n})\n')
-                msg = utils.build_FIND_NODE_msg(ID, tuple(iter(self.node)))
+                    # k_closest = n[1].FIND_NODE(ID, self.node.k)
+                    msg = utils.build_FIND_NODE_msg(ID, self.node.asTuple())
 
-                ip, port = n[1], n[2]
-                self.socket.sendto(json.dumps(msg).encode(), (ip, port))
-                k_closest = []
-                try:
-                    data = utils.get_answer(msg['key'], self.socket)
-
-                    k_closest = [(t[0], tuple(t[1])) for t in data['result']]
-                    print(f'AAAAAA: {k_closest}')
-                    f.write(f'Result of FIND_NODE({self.node}, {n}): {k_closest}\n')
-                    self.update(tuple(data['sender']))
-                except socket.timeout:
-                    f.write(f'Timeout during FIND_NODE({self.node}, {n})\n')
-                    pass
+                    ip, port = n[1], n[2]
+                    self.send_udp_msg(json.dumps(msg).encode(), (ip, port))
+                    # data = self.get_answer(msg['key'])
+                    data = self.get_response(msg['key'])
+                    if data:
+                        k_closest = [(t[0], tuple(t[1])) for t in data['result']]
+                        self.update(tuple(data['sender']))
 
                 if (d,n) not in enquired:
                     enquired.append((d, n))
+                
+                if data != None and (d,n) not in alives:
+                    alives.append((d, n))
 
                 for t in k_closest:
                     if not t in enquired and not t in to_query and not t in pending:
@@ -293,55 +355,56 @@ class Peer:
                     to_query.append(heapq.heappop(pending))
                 except:
                     break
-            f.write(f'Results after round #{round}: {enquired}\n')
             round += 1
 
-        #print(f'enquired: {enquired}')
-        return heapq.nsmallest(self.node.k, enquired)
-
+        # return heapq.nsmallest(self.node.k, enquired)
+        return heapq.nsmallest(self.node.k, alives)
 
     def lookup_value(self, ID):
-        f = open('lookup_debug', 'w')
-        f.write(f'Performing lookup for {ID}\n')
-        f.write(f'First step: getting alpha={self.node.alpha} closest nodes to {ID}\n')
         to_query = self.node.get_n_closest(ID, self.node.alpha)
-        f.write(f'Result: {to_query}\n')
 
         pending = []
         heapq.heapify(pending)
 
-        enquired = []
+        myinfo = (self.node.ID ^ ID, self.node.asTuple())
+        enquired = [myinfo]
+        alives = [myinfo]
+
+        if len(to_query) == 0:
+            founded, data = self.node.FIND_VALUE(ID)
+            if founded: return (True, data)
+            else: return (False, None)
+        else:
+            founded, data = self.node.FIND_VALUE(ID)
+            if founded: return (True, data)
 
         closest_node = heapq.nsmallest(1, to_query)[0][0]
 
         round = 1
         while True:
-            f.write(f'Round {round} of lookup({self.node}, 7)\n')
-            f.write(f'Nodes to query: {to_query}\n')
 
             for d,n in to_query:
+                k_closest, data = [], None
+                if not Node.Equals(n, self.node):
+                    msg = utils.build_FIND_VALUE_msg(ID, self.node.asTuple())
 
-                # k_closest = n[1].FIND_NODE(ID, self.node.k)
-                f.write(f'Performing FIND_VALUE({self.node}, {n})\n')
-                msg = utils.build_FIND_VALUE_msg(ID, tuple(iter(self.node)))
+                    sock = self.sendall(msg, n[1], close=False)
+                    # data = self.get_response(msg['key'])
+                    data = self.recvall(sock)
+                    utils.close_connection(sock)
 
-                ip, port = n[1], n[2]
-                self.socket.sendto(json.dumps(msg).encode(), (ip, port))
-                k_closest = []
-                try:
-                    data = utils.get_answer(msg['key'], self.socket)
-                    if data['result'][0]:
-                        return data['result']
-                    k_closest = [(t[0], tuple(t[1])) for t in data['result'][1]]
-
-                    f.write(f'Result of FIND_NODE({self.node}, {n}): {k_closest}\n')
-                    self.update(tuple(data['sender']))
-                except socket.timeout:
-                    f.write(f'Timeout during FIND_NODE({self.node}, {n})\n')
-                    pass
+                    if data != None:
+                        data = json.loads(data)
+                        if data['result'][0]: return data['result']
+                        # if data['result'][0]: return data
+                        k_closest = [(t[0], tuple(t[1])) for t in data['result'][1]]
+                        self.update(tuple(data['sender']))
 
                 if (d,n) not in enquired:
                     enquired.append((d, n))
+                
+                if data != None and (d,n) not in alives:
+                    alives.append((d, n))
 
                 for t in k_closest:
                     if not t in enquired and not t in to_query and not t in pending:
@@ -353,8 +416,6 @@ class Peer:
                 break
 
             c = heapq.nsmallest(1, pending)[0][0]
-            print(c)
-            print(closest_node)
             top = self.node.alpha if c <= closest_node else self.node.k
             closest_node = min(closest_node, c)
             for _ in range(top):
@@ -362,21 +423,320 @@ class Peer:
                     to_query.append(heapq.heappop(pending))
                 except:
                     break
-            f.write(f'Results after round #{round}: {enquired}\n')
             round += 1
 
-        print(f'enquired: {enquired}')
         return (False, heapq.nsmallest(self.node.k, enquired))
+
+    def get_response(self, expected_key, timeout=2.5):
+        s = time.time()
+        while expected_key not in self.reponses and time.time() - s < timeout: pass
+        # if expected_key in self.reponses: return self.reponses.pop(expected_key)
+        # return None
+        # while expected_key not in self.reponses: pass
+        if expected_key not in self.reponses: return None
+        self.lock.acquire(True)
+        ans = self.reponses.pop(expected_key)
+        self.lock.release()
+        return ans
+
+    def receive_from(self, timeout=2.5):
+        # self.udp_socket.settimeout(timeout)
+        msg, addr = None, None
+        try:
+            msg, addr = self.udp_socket.recvfrom(1024)
+        # except socket.timeout: pass
+        except (socket.timeout, ConnectionResetError):
+            self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.udp_socket.bind((self.node.ip, self.node.port))
+            try: msg, addr = self.udp_socket.recvfrom(1024)
+            except (socket.timeout, ConnectionResetError): pass
+
+        return msg, addr
+
+    def set_response(self, key, value, timeout=2.5):
+        self.lock.acquire(blocking=True)
+        self.reponses[key] = value
+        self.lock.release()
+    
+    def delete_response(self, key, timeout=2.5):
+        self.lock.acquire(blocking=True)        
+        self.reponses.pop(key)
+        self.lock.release()
+
+    def discover(self, localhost_only=False):
+        broadcast_msg = { 'operation': 'DISCOVER', 'join': True, 'sender': list(self.node), 'key': utils.generate_random_id() }
+        broadcast_msg = json.dumps(broadcast_msg).encode()
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+        if localhost_only:
+            for p in range(8000, 8011):
+                if p != self.node.port:
+                    sock.sendto(broadcast_msg, ('127.0.0.1', p))
+        else:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            sock.sendto(broadcast_msg, ('255.255.255.255', 8080))
+            # sock.sendto(broadcast_msg, ('255.255.255.255', 8081))
+
+    def join(self):
+        def has_contact(p):
+            for kBucket in p.node.route_table: 
+                if len(kBucket) > 0: return True
+            return False
+
+        while not has_contact(self): 
+            self.discover()
+            time.sleep(1)
+        
+        self.node.print_routing_table()
+
+    def sendall(self, msg, ip, port=9000, close=True):
+        sock = socket.socket()
+        sock.connect((ip, port))
+        sock.sendall(json.dumps(msg).encode() + b'\r\n\r\n')
+        if close: utils.close_connection(sock)
+        return sock
+
+    def send_udp_msg(self, msg, addr):
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.sendto(msg, addr)
+
+    def recv_file(self):
+        self.recvfile_lock.acquire(True)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.bind((self.node.ip, 9090))
+        sock.listen(1)
+        sender, _ = sock.accept()
+        
+        data = b'' 
+        while True:
+            # chunk = sender.recv(1024)
+            chunk = sender.recv(4096)
+            if not chunk:
+                break
+            data += chunk
+        
+        sender.close()
+        sock.close()
+
+        self.recvfile_lock.release()
+        return data
+
+    def recvall(self, client):
+        
+        def recv():
+            data = b''
+            while True: 
+                chunk = client.recv(1024)
+                if not chunk: 
+                    break
+                
+                if chunk.endswith(b'\r\n\r\n'):
+                    data += chunk[0:-4]
+                    # data = chunk.replace(b'\r\n\r\n', b'')
+                    break
+                
+                data += chunk
+
+            return data
+
+        # lock_acquired = self.lock.acquire(True)
+        # if lock_acquired:
+        msg = None
+        try:
+            msg = recv()
+        except OSError: pass
+        
+        return msg
+
+    def attend_clients(self):
+        
+        def attend(client):
+            while True:
+                msg = self.recvall(client)
+                if not msg:
+                    break
+                
+                data = {'method': None}
+                try: 
+                    data = json.loads(msg)
+                except Exception as ex: 
+                    pass
+
+                if data['method'] == 'PUBLISH':
+                    node = self.node.asTuple()
+                    self.publish(data, node, node)
+                elif data['method'] == 'LOOKUP':
+                    answer = self.lookup_value(data['id'])
+
+                    founded, result = answer[0], answer[1]
+                    if founded and result['value_type'] == 'file':
+                        file_bytes = self.recv_file()
+                        # file_bytes = utils.load_file(result['value'])
+                        client.sendall(file_bytes)
+                    else:
+                        if not founded: result = None
+                        client.sendall(json.dumps(result).encode() + b'\r\n\r\n')
+                    client.close()
+
+                elif data['method'] == 'PING':
+                    client.send(b'PING')
+                elif data['method'] == 'STORE':
+                    key, value = data['store_key'], data['store_value']
+                    publisher, sender = tuple(data['publisher']), tuple(data['sender'])
+                    
+                    real_value = None
+                    if data['value_type'] == 'file':
+                        real_value = self.recv_file()
+                    
+                    self.node.STORE(key, value, publisher, sender, data['value_type'], real_value)
+
+                elif data['method'] == 'FIND_VALUE':
+                    founded, result = self.node.FIND_VALUE(data['id'])
+                    answer = {'operation': 'RESPONSE', 'result': (founded, result),
+                                'key': data['key'], 'sender': [self.node.ID, self.node.ip, self.node.port] }
+                    
+                    # client.sendall(json.dumps(answer).encode() + b'\r\n\r\n')
+                    answer = utils.dumps_json(answer)
+                    client.sendall(answer.encode() + b'\r\n\r\n')
+                    if founded and result['value_type'] == 'file':
+                        files_bytes = utils.load_file(result['value'])
+                        self._send_file(files_bytes, data['sender'][1])
+
+                    if not Node.Equals(data['sender'], self.node):
+                        self.update(data['sender'])
+
+        
+        while True:
+            c, _ = self.tcp_server.accept()
+            threading._start_new_thread(attend, (c,))
+
+    def attend_new_nodes(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # sock.bind(('', 8080))
+        sock.bind((self.node.ip, 8080))
+        while True:
+            msg, _ = sock.recvfrom(1024)
+
+            if msg is not None:
+                data = json.loads(msg)
+                addr = data['sender'][1], data['sender'][2]
+                threading._start_new_thread(self.proccess_message, (data, addr))
+
+    def __del__(self):
+        # open('files/destructor called', 'w')
+        self._close_socket(self.udp_socket)
+        self._close_socket(self.tcp_client)
+        self._close_socket(self.tcp_server)                
+
+    def _update_peers_list(self, key, value, publisher, sender):
+        database = utils.load_file(self.node.storage)
+        if key in database:
+            if not isinstance(value, list): value = [value]
+            peers_to_check = set(database[key] + value)
+            
+            if list(peers_to_check) == database[key]: return # no update
+            
+            alive_peers = []
+            for peer in peers_to_check:
+                sock = socket.socket()
+                try: 
+                    sock.connect((peer['ip'], peer['port']))
+                    alive_peers.append(peer)
+                except: pass
+            
+            database[key] = alive_peers
+            utils.dump_json(database, self.node.storage)
+        else:
+            self.node.STORE(key, value, publisher, sender)
+
+    def _update_names_dic(self, key, value, publisher, sender, existing=None):
+        key = str(key)
+
+        database = utils.load_json(self.node.storage)
+        name, data_ID = value[0], value[1]
+
+        if data_ID not in database[key][name]: 
+            database[key][name].append(data_ID)
+        if name == '': 
+            utils.dump_json(database, self.node.storage)
+            return
+
+        # If there is not the '' string remove some old keys
+        to_drop = set()
+        if name in database[key]:
+            if not existing: existing = set()
+            for k in database[key][name]:
+                if k in existing: continue
+
+                exist, _ = self.lookup_value(k)
+                if not exist: 
+                    to_drop.add(k)
+                else:
+                    existing.add(k)
+        
+        # Remove old keys from all dic values
+        for old_key in to_drop:
+            # patterns = list(database[key])
+            for pattern in database[key]:
+                try: database[key][pattern].remove(old_key)
+                except: pass
+
+        utils.dump_json(database, self.node.storage)
+        return existing
+    
+    def _update(self, key, value, publisher, sender):
+        self.node.store_lock.acquire(True)
+        # Updating names
+
+        if key == utils.INDEX_KEY: 
+            if not isinstance(value, list):
+                self._update_names_dic(key, value, publisher, sender)
+            else:
+                existing = None
+                for v in value:
+                    existing = self._update_names_dic(key, v, publisher, sender, existing)
+        else:
+            # Updating peers list
+            self._update_peers_list(key, value, publisher, sender)
+
+        self.node.store_lock.release()
+        
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('-p', '--port', type=int, default=8000)
-    parser.add_argument('-i', '--id', type=int, default=1)
+    parser.add_argument('-p', '--udp_port', type=int, default=8000)
+    parser.add_argument('-i', '--id', type=int, default=0)
+    parser.add_argument('-s', '--tcp_server_port', type=int, default=9000)
+    parser.add_argument('-d', '--ip', type=str, default='192.168.43.144')
 
     args = parser.parse_args()
 
     ID = args.id
-    node = Node(ID, '127.0.0.1', args.port, B=3, k=3, alpha=2)
-    peer = Peer(node)
+    hostname = socket.gethostname()    
+    IP = socket.gethostbyname(hostname)
+    
+    IP = args.ip
+    
+    try:
+        dummy_sock = socket.socket()
+        dummy_sock.bind(('192.168.43.144', 9000))
+        dummy_sock.close()
+    except:
+        IP = '192.168.43.62'
+        ID = 8
+
+    print('IP =', IP)
+    # IP = args.ip
+    node = Node(ID, IP, int(args.udp_port), B=4, k=3, alpha=2)
+    peer = Peer(node, int(args.tcp_server_port))
+
+    threading._start_new_thread(peer.join, ())
+    threading._start_new_thread(peer.check_network, ())
+    threading._start_new_thread(peer.attend_clients, ())    
+    threading._start_new_thread(peer.attend_new_nodes, ())    
+    # threading._start_new_thread(peer.serve, ())
+
     peer.serve()
+    # peer.attend_clients()
