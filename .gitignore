@@ -108,6 +108,7 @@ venv.bak/
 *.json
 main.py
 lookup_debug
+DummyClient.py
 
 # Directories
 .vscode/

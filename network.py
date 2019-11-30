@@ -658,29 +658,30 @@ class Peer:
 
         if data_ID not in database[key][name]: 
             database[key][name].append(data_ID)
-        if name == '': 
-            utils.dump_json(database, self.node.storage)
-            return
 
-        # If there is not the '' string remove some old keys
-        to_drop = set()
-        if name in database[key]:
-            if not existing: existing = set()
-            for k in database[key][name]:
-                if k in existing: continue
+        # if name == '': 
+        #     utils.dump_json(database, self.node.storage)
+        #     return
 
-                exist, _ = self.lookup_value(k)
-                if not exist: 
-                    to_drop.add(k)
-                else:
-                    existing.add(k)
+        # # If there is not the '' string remove some old keys
+        # to_drop = set()
+        # if name in database[key]:
+        #     if not existing: existing = set()
+        #     for k in database[key][name]:
+        #         if k in existing: continue
+
+        #         exist, _ = self.lookup_value(k)
+        #         if not exist: 
+        #             to_drop.add(k)
+        #         else:
+        #             existing.add(k)
         
-        # Remove old keys from all dic values
-        for old_key in to_drop:
-            # patterns = list(database[key])
-            for pattern in database[key]:
-                try: database[key][pattern].remove(old_key)
-                except: pass
+        # # Remove old keys from all dic values
+        # for old_key in to_drop:
+        #     # patterns = list(database[key])
+        #     for pattern in database[key]:
+        #         try: database[key][pattern].remove(old_key)
+        #         except: pass
 
         utils.dump_json(database, self.node.storage)
         return existing
@@ -693,9 +694,8 @@ class Peer:
             if not isinstance(value, list):
                 self._update_names_dic(key, value, publisher, sender)
             else:
-                existing = None
                 for v in value:
-                    existing = self._update_names_dic(key, v, publisher, sender, existing)
+                    self._update_names_dic(key, v, publisher, sender, existing)
         else:
             # Updating peers list
             self._update_peers_list(key, value, publisher, sender)
