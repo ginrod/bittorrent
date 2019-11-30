@@ -28,8 +28,6 @@ class Peer:
         self.tcp_server.bind((node.ip, tcp_server_port))
         self.tcp_server.listen(256)
 
-        self.tcp_client = socket.socket()
-
         now = datetime.datetime.now()
         self.kBucketRefreshTimes = [now] * len(node.route_table)
         self.received_msgs = set()
@@ -626,7 +624,6 @@ class Peer:
     def __del__(self):
         # open('files/destructor called', 'w')
         self._close_socket(self.udp_socket)
-        self._close_socket(self.tcp_client)
         self._close_socket(self.tcp_server)                
 
     def _update_peers_list(self, key, value, publisher, sender):
@@ -717,15 +714,8 @@ if __name__ == '__main__':
     hostname = socket.gethostname()    
     IP = socket.gethostbyname(hostname)
     
-    IP = args.ip
+    # IP = args.ip
     
-    try:
-        dummy_sock = socket.socket()
-        dummy_sock.bind(('192.168.43.144', 9000))
-        dummy_sock.close()
-    except:
-        IP = '192.168.43.62'
-        ID = 8
 
     print('IP =', IP)
     # IP = args.ip

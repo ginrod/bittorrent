@@ -79,29 +79,45 @@ def dumps_json(data):
     return json.dumps(data, default=parse_to_json)
 
 
+
 def build_PING_msg(sender):
-    return { 'operation': 'EXECUTE',
-             'method': 'PING',
-             'sender': list(sender),
-             'key': generate_random_id() }
+    return {'operation': 'EXECUTE',
+            'method': 'PING',
+            'sender': list(sender),
+            'key': generate_random_id()}
+
 
 def build_FIND_NODE_msg(ID, sender):
-    return { 'operation': 'EXECUTE',
-            'method': 'FIND_NODE', 'id' : ID,
+    return {'operation': 'EXECUTE',
+            'method': 'FIND_NODE', 'id': ID,
             'sender': list(sender),
-            'key': generate_random_id() }
+            'key': generate_random_id()}
+
 
 def build_FIND_VALUE_msg(ID, sender):
-    return { 'operation': 'EXECUTE',
-             'method': 'FIND_VALUE', 'id' : ID,
-             'sender' : list(sender),
-             'key': generate_random_id() }
+    return {'operation': 'EXECUTE',
+            'method': 'FIND_VALUE', 'id': ID,
+            'sender': list(sender),
+            'key': generate_random_id()}
 
-def build_STORE_msg(key, value, sender):
-    return { 'operation': 'EXECUTE',
-             'method': 'STORE', 'store_key' : key, 'store_value' : value,
-             'sender': list(sender),
-             'key': generate_random_id() }
+def build_STORE_msg(key, value, publisher, sender, value_type='json'):
+    return {'operation': 'EXECUTE',
+            'method': 'STORE', 'store_key': key, 'store_value': value,
+            'sender': list(sender), 'publisher': list(publisher),
+            'key': generate_random_id(),
+            'value_type': value_type }
+
+def build_PUBLISH_msg(key, value, value_type='json', to_update=False):
+    return {'method': 'PUBLISH',
+            'store_key': key, 'store_value': value,
+            'key': generate_random_id(),
+            'value_type': value_type,
+            'to_update': to_update }
+
+def build_LOOKUP_msg(ID):
+    return {'operation': 'EXECUTE',
+            'method': 'LOOKUP', 'id': ID,
+            'key': generate_random_id() }
 
 def generate_random_id():
     return uuid.uuid4().hex
