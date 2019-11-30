@@ -1,19 +1,15 @@
-import sys
-import hashlib
-import os
-import torrent_parser
-import time
+import sys, hashlib, os, torrent_parser, time
 
-
+MAX_PIECE_SIZE = 1024 * 1024
 
 def generate_hash(piece, hash_func):
-    h = hash_func(piece.encode())
+    h = hash_func(piece)
     return h.hexdigest()
 
 def generate_pieces(paths, piece_length):
     pieces = []
     for path in paths:
-        with open(path) as file:
+        with open(path, "rb") as file:
             while True:
                 piece = file.read(piece_length)
                 if not piece:
@@ -21,7 +17,23 @@ def generate_pieces(paths, piece_length):
                 pieces.append(generate_hash(piece, hashlib.sha1))
     return pieces
 
-def create_metainfo(paths, announce, announce_list=[], mode="single-file", piece_length=256*1024, encoding="utf-8", comment="", created_by=""):
+def choose_piece_length(file_size):
+    piece_length = 16 * 1024
+    number_of_pieces = file_size / piece_length
+
+    if piece_length >= file_size:
+        return piece_length
+
+    while number_of_pieces >= 1250 and piece_length < (1024*1024):
+        piece_length += 1024
+        number_of_pieces = file_size/piece_length
+
+    return piece_length
+
+def create_metainfo(paths, announce, announce_list=[], mode="single-file", encoding="utf-8", comment="", created_by=""):
+    size = os.stat(paths[0]).st_size
+    # piece_length = choose_piece_length(size)
+    piece_length = MAX_PIECE_SIZE
     metainfo = {
         "info": {
             "piece_length": piece_length,
@@ -38,8 +50,20 @@ def create_metainfo(paths, announce, announce_list=[], mode="single-file", piece
 
     if mode == "single-file":
         with open(paths[0]) as file:
-            metainfo["info"]["name"] = file.name
-            metainfo["info"]["length"] = os.stat(paths[0]).st_size
+            metainfo["info"]["name"] = paths[0]
+
+            try:
+                metainfo["info"]["short_name"] = file.name[file.name.rfind('/') + 1: file.name.rfind('.')]
+            except:
+                metainfo["info"]["short_name"] = file.name[file.name.rfind('/') + 1:]
+
+            try:
+                metainfo["info"]["extension"] = file.name[file.name.rfind('.'):]
+            except:
+                metainfo["info"]["extension"] = "None"
+
+            metainfo["info"]["length"] = size
+            metainfo["info"]["no_pieces"] = metainfo["info"]["length"] // metainfo["info"]["piece_length"] + 1
 
     elif mode == "multiple-file":
         files = []
@@ -49,7 +73,7 @@ def create_metainfo(paths, announce, announce_list=[], mode="single-file", piece
         metainfo["info"]["files"] = files
 
     else: raise Exception("Invalid file mode")
-    print(metainfo['info']['pieces'])
+
     return metainfo
 
 def create_torrent(metainfo_dict):

@@ -103,12 +103,16 @@ venv.bak/
 # mypy
 .mypy_cache/
 
+#directories
+downloaded
+
 # input files for testing
 *.txt
 *.json
 main.py
 lookup_debug
 DummyClient.py
+input.txt
 
 # Directories
 .vscode/
