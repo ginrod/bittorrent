@@ -124,14 +124,14 @@ class Peer:
                     #write the whole piece in the partial file of the download
                     print(f"Copying piece {i}")
                     try:
-                        with open(f"/media/tony/01D54288CC477C00/Escuela/4to/Sistemas distribuidos/BitTorrent/bittorrent/BitTorrentProtocol/downloaded/{metainfo['info']['short_name']}{metainfo['info']['extension']}", "r+b") as f:
+                        with open(f"downloaded/{metainfo['info']['short_name']}{metainfo['info']['extension']}", "r+b") as f:
                             piece_length = metainfo["info"]["piece_length"]
                             #set the offset of the file in the correct place of the piece
                             f.seek(piece_length * i, 0)
                             #write the piece
                             f.write(data)
                     except:
-                        with open(f"/media/tony/01D54288CC477C00/Escuela/4to/Sistemas distribuidos/BitTorrent/bittorrent/BitTorrentProtocol/downloaded/{metainfo['info']['short_name']}{metainfo['info']['extension']}", "wb") as f:
+                        with open(f"downloaded/{metainfo['info']['short_name']}{metainfo['info']['extension']}", "wb") as f:
                             piece_length = metainfo["info"]["piece_length"]
                             f.seek(piece_length * i, 0)
                             f.write(data)

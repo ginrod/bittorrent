@@ -14,11 +14,11 @@ import sys
 INDEX_KEY = 10
 
 class Peer:
-    
+
     def __init__(self, node, tcp_server_port=9000):
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.udp_socket.bind((node.ip, node.port))
-        
+
         self.lock = threading.Lock()
         self.node = node
         self.reponses = {}
@@ -45,7 +45,7 @@ class Peer:
 
                 if msg is not None:
                     data = json.loads(msg)
-                    
+
                     if data['key'] in self.received_msgs:
                         continue
                     else:
@@ -53,7 +53,7 @@ class Peer:
 
                     addr = data['sender'][1], data['sender'][2]
                     threading._start_new_thread(self.proccess_message, (data, addr))
-                
+
                 self.node.print_routing_table()
         except KeyboardInterrupt:
             self.__del__()
@@ -63,13 +63,13 @@ class Peer:
         if data['operation'] != 'DISCOVER':
             print("Data received: " + str(data))
 
-        if data['operation'] == 'DISCOVER': 
+        if data['operation'] == 'DISCOVER':
             if data['join']:
                 # addr = str(data['sender'][1]), int(data['sender'][2])
                 if addr != (self.node.ip, self.node.port):
                     answer = { 'operation': 'CONTACT', 'sender': list(self.node),
                             'key': data['key'] }
-                    
+
                     self.send_udp_msg(json.dumps(answer).encode(), addr)
                     self.update(tuple(data['sender']))
             else:
@@ -82,7 +82,7 @@ class Peer:
         elif data['operation'] == 'CONTACT':
             contact = tuple(data['sender'])
             self.update(contact)
-            threading._start_new_thread(self.lookup_node, (self.node.ID, ))    
+            threading._start_new_thread(self.lookup_node, (self.node.ID, ))
 
         # A peer has to perform a method specified by other peer by RPC
         elif data['operation'] == 'EXECUTE':
@@ -159,7 +159,7 @@ class Peer:
             self.sendall(msg, node[1])
             if data['value_type'] == 'file':
                 threading._start_new_thread(self._send_file, (file_bytes, node[1]))
-        
+
         return k_closest
 
     def _send_file(self, file_bytes, ip):
@@ -206,9 +206,9 @@ class Peer:
 
         my_local_database = utils.load_json(self.node.storage)
         keys_to_drop = set()
-        
-        # database = Database(self.node.ip, 5050, contact=(self.node.ip, self.tcp_server_port)) 
-        database = Database(self.node.ip, 5050, contact=(self.node.ip, 9000)) 
+
+        # database = Database(self.node.ip, 5050, contact=(self.node.ip, self.tcp_server_port))
+        database = Database(self.node.ip, 5050, contact=(self.node.ip, 9000))
         for key, data in my_local_database.items():
             original_republish = True if datetime.datetime.now() - data['timeo'] < datetime.timedelta(seconds=240) else False
             # original_republish = True if datetime.datetime.now() - data['timeo'] < datetime.timedelta(seconds=24) else False
@@ -234,7 +234,7 @@ class Peer:
 
         # for key in keys_to_drop:
         #     my_local_database.pop(key)
-        
+
         # utils.dump_json(my_local_database, self.node.storage)
         self.node.store_lock.acquire(True)
 
@@ -292,7 +292,7 @@ class Peer:
         self.lock.acquire()
         if self.kBucketRefreshTimes[idx] >= t: return
         self.kBucketRefreshTimes[idx] = t
-        self.lock.release()            
+        self.lock.release()
 
     def lookup_node(self, ID):
         to_query = self.node.get_n_closest(ID, self.node.alpha)
@@ -330,7 +330,7 @@ class Peer:
 
                 if (d,n) not in enquired:
                     enquired.append((d, n))
-                
+
                 if data != None and (d,n) not in alives:
                     alives.append((d, n))
 
@@ -400,7 +400,7 @@ class Peer:
 
                 if (d,n) not in enquired:
                     enquired.append((d, n))
-                
+
                 if data != None and (d,n) not in alives:
                     alives.append((d, n))
 
@@ -455,9 +455,9 @@ class Peer:
         self.lock.acquire(blocking=True)
         self.reponses[key] = value
         self.lock.release()
-    
+
     def delete_response(self, key, timeout=2.5):
-        self.lock.acquire(blocking=True)        
+        self.lock.acquire(blocking=True)
         self.reponses.pop(key)
         self.lock.release()
 
@@ -478,14 +478,14 @@ class Peer:
 
     def join(self):
         def has_contact(p):
-            for kBucket in p.node.route_table: 
+            for kBucket in p.node.route_table:
                 if len(kBucket) > 0: return True
             return False
 
-        while not has_contact(self): 
+        while not has_contact(self):
             self.discover()
             time.sleep(1)
-        
+
         self.node.print_routing_table()
 
     def sendall(self, msg, ip, port=9000, close=True):
@@ -505,15 +505,15 @@ class Peer:
         sock.bind((self.node.ip, 9090))
         sock.listen(1)
         sender, _ = sock.accept()
-        
-        data = b'' 
+
+        data = b''
         while True:
             # chunk = sender.recv(1024)
             chunk = sender.recv(4096)
             if not chunk:
                 break
             data += chunk
-        
+
         sender.close()
         sock.close()
 
@@ -521,19 +521,19 @@ class Peer:
         return data
 
     def recvall(self, client):
-        
+
         def recv():
             data = b''
-            while True: 
+            while True:
                 chunk = client.recv(1024)
-                if not chunk: 
+                if not chunk:
                     break
-                
+
                 if chunk.endswith(b'\r\n\r\n'):
                     data += chunk[0:-4]
                     # data = chunk.replace(b'\r\n\r\n', b'')
                     break
-                
+
                 data += chunk
 
             return data
@@ -544,21 +544,21 @@ class Peer:
         try:
             msg = recv()
         except OSError: pass
-        
+
         return msg
 
     def attend_clients(self):
-        
+
         def attend(client):
             while True:
                 msg = self.recvall(client)
                 if not msg:
                     break
-                
+
                 data = {'method': None}
-                try: 
+                try:
                     data = json.loads(msg)
-                except Exception as ex: 
+                except Exception as ex:
                     pass
 
                 if data['method'] == 'PUBLISH':
@@ -582,18 +582,18 @@ class Peer:
                 elif data['method'] == 'STORE':
                     key, value = data['store_key'], data['store_value']
                     publisher, sender = tuple(data['publisher']), tuple(data['sender'])
-                    
+
                     real_value = None
                     if data['value_type'] == 'file':
                         real_value = self.recv_file()
-                    
+
                     self.node.STORE(key, value, publisher, sender, data['value_type'], real_value)
 
                 elif data['method'] == 'FIND_VALUE':
                     founded, result = self.node.FIND_VALUE(data['id'])
                     answer = {'operation': 'RESPONSE', 'result': (founded, result),
                                 'key': data['key'], 'sender': [self.node.ID, self.node.ip, self.node.port] }
-                    
+
                     # client.sendall(json.dumps(answer).encode() + b'\r\n\r\n')
                     answer = utils.dumps_json(answer)
                     client.sendall(answer.encode() + b'\r\n\r\n')
@@ -604,7 +604,7 @@ class Peer:
                     if not Node.Equals(data['sender'], self.node):
                         self.update(data['sender'])
 
-        
+
         while True:
             c, _ = self.tcp_server.accept()
             threading._start_new_thread(attend, (c,))
@@ -624,24 +624,24 @@ class Peer:
     def __del__(self):
         # open('files/destructor called', 'w')
         self._close_socket(self.udp_socket)
-        self._close_socket(self.tcp_server)                
+        self._close_socket(self.tcp_server)
 
     def _update_peers_list(self, key, value, publisher, sender):
         database = utils.load_file(self.node.storage)
         if key in database:
             if not isinstance(value, list): value = [value]
             peers_to_check = set(database[key] + value)
-            
+
             if list(peers_to_check) == database[key]: return # no update
-            
+
             alive_peers = []
             for peer in peers_to_check:
                 sock = socket.socket()
-                try: 
+                try:
                     sock.connect((peer['ip'], peer['port']))
                     alive_peers.append(peer)
                 except: pass
-            
+
             database[key] = alive_peers
             utils.dump_json(database, self.node.storage)
         else:
@@ -653,10 +653,10 @@ class Peer:
         database = utils.load_json(self.node.storage)
         name, data_ID = value[0], value[1]
 
-        if data_ID not in database[key][name]: 
+        if data_ID not in database[key][name]:
             database[key][name].append(data_ID)
 
-        # if name == '': 
+        # if name == '':
         #     utils.dump_json(database, self.node.storage)
         #     return
 
@@ -668,11 +668,11 @@ class Peer:
         #         if k in existing: continue
 
         #         exist, _ = self.lookup_value(k)
-        #         if not exist: 
+        #         if not exist:
         #             to_drop.add(k)
         #         else:
         #             existing.add(k)
-        
+
         # # Remove old keys from all dic values
         # for old_key in to_drop:
         #     # patterns = list(database[key])
@@ -682,12 +682,12 @@ class Peer:
 
         utils.dump_json(database, self.node.storage)
         return existing
-    
+
     def _update(self, key, value, publisher, sender):
         self.node.store_lock.acquire(True)
         # Updating names
 
-        if key == utils.INDEX_KEY: 
+        if key == utils.INDEX_KEY:
             if not isinstance(value, list):
                 self._update_names_dic(key, value, publisher, sender)
             else:
@@ -698,7 +698,7 @@ class Peer:
             self._update_peers_list(key, value, publisher, sender)
 
         self.node.store_lock.release()
-        
+
 
 if __name__ == '__main__':
     import argparse
@@ -711,11 +711,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     ID = args.id
-    hostname = socket.gethostname()    
+    hostname = socket.gethostname()
     IP = socket.gethostbyname(hostname)
-    
+
     # IP = args.ip
-    
+
 
     print('IP =', IP)
     # IP = args.ip
@@ -724,8 +724,8 @@ if __name__ == '__main__':
 
     threading._start_new_thread(peer.join, ())
     threading._start_new_thread(peer.check_network, ())
-    threading._start_new_thread(peer.attend_clients, ())    
-    threading._start_new_thread(peer.attend_new_nodes, ())    
+    threading._start_new_thread(peer.attend_clients, ())
+    threading._start_new_thread(peer.attend_new_nodes, ())
     # threading._start_new_thread(peer.serve, ())
 
     peer.serve()
