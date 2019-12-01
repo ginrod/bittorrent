@@ -16,7 +16,7 @@ class Node:
         self.k = k
         self.B = B
 
-        utils.create_dirs('files/storage')
+        # utils.create_dirs('files/storage')
         self.storage = 'files/storage/storage.json'
 
         self.route_table = [[] for _ in range(B)]
@@ -58,16 +58,20 @@ class Node:
         return (self.route_table[i], i)
 
     def distance_to(self, other):
-        return self.ID ^ other[0]
+        # return self.ID ^ other[0]
+        return self.ID ^ int(other[0])
 
     def FIND_VALUE(self, ID):
         data = utils.load_json(self.storage)
         if str(ID) in data:
-            return (True, data[str(ID)])
-        return (False, self.FIND_NODE(ID))
+            file_bytes = None
+            if data[str(ID)]['value_type'] == 'file': 
+                file_bytes = utils.load_file(data[str(ID)]['value']) 
+            return (True, data[str(ID)], file_bytes)
+        return (False, self.FIND_NODE(ID), None)
     
-    def STORE(self, key, value, publisher, sender, value_type='json', real_value=None):
-        self.store_lock.acquire(True)
+    def STORE(self, key, value, publisher, sender, value_type='json', real_value=None, to_update=False):
+        self.store_lock.acquire()
         key = str(key)
 
         database = utils.load_json(self.storage)
@@ -91,9 +95,13 @@ class Node:
             data['publisher'] = publisher
             data['timeo'] = data['timer'] = datetime.datetime.now()
             data['value_type'] = value_type
+            data['to_update'] = to_update
 
         database[key] = data
+
+        # if database:
         utils.dump_json(database, self.storage)
+        
         self.store_lock.release()
 
     def PING(self):

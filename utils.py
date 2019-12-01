@@ -4,10 +4,14 @@ import time
 import json, datetime, os
 
 import torrent_parser
-import hashlib
+import hashlib, sys
 
 # Kademlia ID used to do a name index in database
 INDEX_KEY = 10
+
+def get_key(s: str):
+    h = hashlib.sha1(s.encode())
+    return int.from_bytes(h.digest(), byteorder=sys.byteorder)
 
 def get_prefixes(name):
     prefixes = set()
@@ -50,8 +54,12 @@ def parse_to_json(obj):
 
 def parse_from_json(database):
     for k in database:
-        database[k]['timeo'] = datetime.datetime(*(database[k]['timeo']))
-        database[k]['timer'] = datetime.datetime(*(database[k]['timer']))
+        try:
+            database[k]['timeo'] = datetime.datetime(*(database[k]['timeo']))
+            database[k]['timer'] = datetime.datetime(*(database[k]['timer']))
+        except :
+            database[k][1]['timeo'] = datetime.datetime(*(database[k][1]['timeo']))
+            database[k][1]['timer'] = datetime.datetime(*(database[k][1]['timer']))
 
     return database
 
@@ -66,16 +74,22 @@ def load_json(path):
         with open(path) as json_file:
             data = parse_from_json(json.load(json_file))
     except:
-        with open(path, 'w') as json_file:
-            json.dump(data, json_file, default=parse_to_json)
+        # dump_json(data, path)
+        pass
 
     return data
 
 def dump_json(data, path):
+    idx = path.rindex('/')
+    dirs = path[:idx]
+    create_dirs(dirs)
+    # if not data:
+    #     x = 6
+
     with open(path, 'w') as json_file:
         json.dump(data, json_file, default=parse_to_json)
 
-def dumps_json(data):
+def dumps_json(data) -> str:
     return json.dumps(data, default=parse_to_json)
 
 
@@ -100,12 +114,13 @@ def build_FIND_VALUE_msg(ID, sender):
             'sender': list(sender),
             'key': generate_random_id()}
 
-def build_STORE_msg(key, value, publisher, sender, value_type='json'):
+def build_STORE_msg(key, value, publisher, sender, value_type='json', to_update=False):
     return {'operation': 'EXECUTE',
             'method': 'STORE', 'store_key': key, 'store_value': value,
             'sender': list(sender), 'publisher': list(publisher),
             'key': generate_random_id(),
-            'value_type': value_type }
+            'value_type': value_type,
+            'to_update': to_update }
 
 def build_PUBLISH_msg(key, value, value_type='json', to_update=False):
     return {'method': 'PUBLISH',
@@ -119,9 +134,14 @@ def build_LOOKUP_msg(ID):
             'method': 'LOOKUP', 'id': ID,
             'key': generate_random_id() }
 
+def build_UPDATE_msg(key, value, publisher, sender):
+    return {'operation': 'EXECUTE',
+            'method': 'UPDATE', 'store_key': key, 'store_value': value,
+            'sender': list(sender), 'publisher': list(publisher),
+            'key': generate_random_id() }
+
 def generate_random_id():
     return uuid.uuid4().hex
-
 
 def load(name):
     f = None
@@ -133,6 +153,9 @@ def load(name):
 
 
 def save_file(path, file_bytes):
+    idx = path.rindex('/')
+    dirs = path[:idx]
+    create_dirs(dirs)
     with open(path, 'wb') as f:
         f.write(file_bytes)
 
@@ -150,7 +173,8 @@ def close_connection(sock):
 
 def create_dirs(path):
     try: os.makedirs(path)
-    except OSError: pass
+    except OSError: 
+        pass
 
 def assign(data, name='', to_update=False):
     return (data, name, to_update) 

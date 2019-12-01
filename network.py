@@ -32,7 +32,7 @@ class Peer:
         self.kBucketRefreshTimes = [now] * len(node.route_table)
         self.received_msgs = set()
 
-        utils.create_dirs('files/storage/files')
+        # utils.create_dirs('files/storage/files')
         self.recvfile_lock = threading.Lock()
 
     def serve(self):
@@ -70,7 +70,7 @@ class Peer:
                     answer = { 'operation': 'CONTACT', 'sender': list(self.node),
                             'key': data['key'] }
                     
-                    self.send_udp_msg(json.dumps(answer).encode(), addr)
+                    self.send_udp_msg(utils.dumps_json(answer).encode(), addr)
                     self.update(tuple(data['sender']))
             else:
                 if addr != (self.node.ip, self.node.port):
@@ -102,7 +102,7 @@ class Peer:
             elif data['method'] == 'STORE':
                 key, value = data['store_key'], data['store_value']
                 publisher, sender = tuple(data['publisher']), tuple(data['sender'])
-                result = self.node.STORE(key, value, publisher, sender)
+                result = self.node.STORE(key, value, publisher, sender, to_update=data['to_update'])
             elif data['method'] == 'LOOKUP':
                 result = self.lookup_value(data["id"])
             elif data['method'] == 'PUBLISH':
@@ -112,7 +112,7 @@ class Peer:
             if result is not None:
                 answer = {'operation': 'RESPONSE', 'result': result,
                             'key': data['key'], 'sender': [self.node.ID, self.node.ip, self.node.port] }
-                answer = json.dumps(answer).encode()
+                answer = utils.dumps_json(answer).encode()
                 self.send_udp_msg(answer, addr)
 
 
@@ -135,7 +135,7 @@ class Peer:
             if msg is not None:
                 # The address of the remote peer wich it will be used as the target of the RPC
                 addr = (data['ip'], data['port'])
-                msg = json.dumps(msg).encode()
+                msg = utils.dumps_json(msg).encode()
                 self.send_udp_msg(msg, addr)
 
 
@@ -145,17 +145,17 @@ class Peer:
             if not Node.Equals(data['sender'], self.node):
                 self.update(data['sender'])
 
-    def publish(self, data, publisher, sender):
-        if data['value_type'] == 'file':
+    def publish(self, data, publisher, sender, file_bytes=None):
+        if data['value_type'] == 'file' and not file_bytes:
             file_bytes = self.recv_file()
-
+        
         k_closest = [n for _, n in self.lookup_node(data['store_key'])]
         for node in k_closest:
             if data['to_update']:
-                self._update(data['store_key'], data['store_value'], publisher, sender)
-                continue
-
-            msg = utils.build_STORE_msg(data['store_key'], data['store_value'], publisher, sender, data['value_type'])
+                msg = utils.build_UPDATE_msg(data['store_key'], data['store_value'], publisher, sender)
+                # self._update(data['store_key'], data['store_value'], publisher, sender)
+            else:
+                msg = utils.build_STORE_msg(data['store_key'], data['store_value'], publisher, sender, data['value_type'])
             self.sendall(msg, node[1])
             if data['value_type'] == 'file':
                 threading._start_new_thread(self._send_file, (file_bytes, node[1]))
@@ -208,7 +208,7 @@ class Peer:
         keys_to_drop = set()
         
         # database = Database(self.node.ip, 5050, contact=(self.node.ip, self.tcp_server_port)) 
-        database = Database(self.node.ip, 5050, contact=(self.node.ip, 9000)) 
+        # database = Database(self.node.ip, 5050, contact=(self.node.ip, 9000)) 
         for key, data in my_local_database.items():
             original_republish = True if datetime.datetime.now() - data['timeo'] < datetime.timedelta(seconds=240) else False
             # original_republish = True if datetime.datetime.now() - data['timeo'] < datetime.timedelta(seconds=24) else False
@@ -226,17 +226,25 @@ class Peer:
 
                 # Republishing
                 # self.publish(data, data['publisher'], self.node.asTuple())
-                data = utils.build_STORE_msg(key, data['value'], data['publisher'], self.node.asTuple(), value_type=data['value_type'])
-                k_closest = self.publish(data, data['publisher'], self.node.asTuple())
+                file_bytes = None
+                if data['value_type'] == 'file':
+                    file_bytes = utils.load_file(data['value'])
+                
+                msg = utils.build_PUBLISH_msg(key, data['value'], data['value_type'], data['to_update'])
+
+                k_closest = self.publish(msg, data['publisher'], self.node.asTuple(), file_bytes)
                 if self.node.asTuple() not in k_closest:
                     keys_to_drop.add(key)
                 # if data['value_type']
-
-        # for key in keys_to_drop:
-        #     my_local_database.pop(key)
         
-        # utils.dump_json(my_local_database, self.node.storage)
-        self.node.store_lock.acquire(True)
+        self.node.store_lock.acquire()
+        my_local_database = utils.load_json(self.node.storage)
+        for key in keys_to_drop:
+            my_local_database.pop(key)
+        
+        # if my_local_database:
+        utils.dump_json(my_local_database, self.node.storage)
+        self.node.store_lock.release()
 
 
     def check_network(self, time_unit=1):
@@ -249,6 +257,7 @@ class Peer:
     def update(self, senderNode):
         senderNode = tuple(senderNode)
         senderID = senderNode[0]
+        if senderID == self.node.ID: return
 
         #Find the appropiate k-bucket for the sender id
         kBucket, idx = self.node.find_kBucket(senderID)
@@ -272,7 +281,7 @@ class Peer:
                 # If exists it is moved to the tail of the list and the sender node is discarded
                 try:
                     # print(kBucket[0])
-                    self.send_udp_msg(json.dumps(msg).encode(), (leastNodeIp, leastNodePort))
+                    self.send_udp_msg(utils.dumps_json(msg).encode(), (leastNodeIp, leastNodePort))
 
                     # self.get_answer(msg['key'])
                     self.get_response(msg['key'])
@@ -295,6 +304,7 @@ class Peer:
         self.lock.release()            
 
     def lookup_node(self, ID):
+        ID = int(ID)
         to_query = self.node.get_n_closest(ID, self.node.alpha)
 
         pending = []
@@ -321,7 +331,7 @@ class Peer:
                     msg = utils.build_FIND_NODE_msg(ID, self.node.asTuple())
 
                     ip, port = n[1], n[2]
-                    self.send_udp_msg(json.dumps(msg).encode(), (ip, port))
+                    self.send_udp_msg(utils.dumps_json(msg).encode(), (ip, port))
                     # data = self.get_answer(msg['key'])
                     data = self.get_response(msg['key'])
                     if data:
@@ -369,12 +379,12 @@ class Peer:
         alives = [myinfo]
 
         if len(to_query) == 0:
-            founded, data = self.node.FIND_VALUE(ID)
-            if founded: return (True, data)
-            else: return (False, None)
+            founded, data, file_bytes = self.node.FIND_VALUE(ID)
+            if founded: return (True, data, file_bytes)
+            else: return (False, myinfo, None)
         else:
-            founded, data = self.node.FIND_VALUE(ID)
-            if founded: return (True, data)
+            founded, data, file_bytes = self.node.FIND_VALUE(ID)
+            if founded: return (True, data, file_bytes)
 
         closest_node = heapq.nsmallest(1, to_query)[0][0]
 
@@ -423,7 +433,7 @@ class Peer:
                     break
             round += 1
 
-        return (False, heapq.nsmallest(self.node.k, enquired))
+        return (False, heapq.nsmallest(self.node.k, enquired), None)
 
     def get_response(self, expected_key, timeout=2.5):
         s = time.time()
@@ -432,7 +442,7 @@ class Peer:
         # return None
         # while expected_key not in self.reponses: pass
         if expected_key not in self.reponses: return None
-        self.lock.acquire(True)
+        self.lock.acquire()
         ans = self.reponses.pop(expected_key)
         self.lock.release()
         return ans
@@ -452,18 +462,19 @@ class Peer:
         return msg, addr
 
     def set_response(self, key, value, timeout=2.5):
-        self.lock.acquire(blocking=True)
+        self.lock.acquire()
         self.reponses[key] = value
         self.lock.release()
     
     def delete_response(self, key, timeout=2.5):
-        self.lock.acquire(blocking=True)        
+        self.lock.acquire()        
         self.reponses.pop(key)
         self.lock.release()
 
     def discover(self, localhost_only=False):
         broadcast_msg = { 'operation': 'DISCOVER', 'join': True, 'sender': list(self.node), 'key': utils.generate_random_id() }
-        broadcast_msg = json.dumps(broadcast_msg).encode()
+        broadcast_msg = utils.dumps_json(broadcast_msg)
+        broadcast_msg = broadcast_msg.encode()
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         if localhost_only:
@@ -491,7 +502,7 @@ class Peer:
     def sendall(self, msg, ip, port=9000, close=True):
         sock = socket.socket()
         sock.connect((ip, port))
-        sock.sendall(json.dumps(msg).encode() + b'\r\n\r\n')
+        sock.sendall(utils.dumps_json(msg).encode() + b'\r\n\r\n')
         if close: utils.close_connection(sock)
         return sock
 
@@ -558,7 +569,7 @@ class Peer:
                 data = {'method': None}
                 try: 
                     data = json.loads(msg)
-                except Exception as ex: 
+                except: 
                     pass
 
                 if data['method'] == 'PUBLISH':
@@ -567,14 +578,16 @@ class Peer:
                 elif data['method'] == 'LOOKUP':
                     answer = self.lookup_value(data['id'])
 
-                    founded, result = answer[0], answer[1]
+                    founded, result, file_bytes = answer[0], answer[1], answer[2]
                     if founded and result['value_type'] == 'file':
-                        file_bytes = self.recv_file()
-                        # file_bytes = utils.load_file(result['value'])
+                        
+                        if not file_bytes: file_bytes = self.recv_file()
+                        # try: client.sendall(file_bytes)
+                        # except: pass
                         client.sendall(file_bytes)
                     else:
                         if not founded: result = None
-                        client.sendall(json.dumps(result).encode() + b'\r\n\r\n')
+                        client.sendall(utils.dumps_json(result).encode() + b'\r\n\r\n')
                     client.close()
 
                 elif data['method'] == 'PING':
@@ -587,22 +600,25 @@ class Peer:
                     if data['value_type'] == 'file':
                         real_value = self.recv_file()
                     
-                    self.node.STORE(key, value, publisher, sender, data['value_type'], real_value)
+                    self.node.STORE(key, value, publisher, sender, data['value_type'], real_value, data['to_update'])
 
                 elif data['method'] == 'FIND_VALUE':
-                    founded, result = self.node.FIND_VALUE(data['id'])
-                    answer = {'operation': 'RESPONSE', 'result': (founded, result),
+                    founded, result, file_bytes = self.node.FIND_VALUE(data['id'])
+                    answer = {'operation': 'RESPONSE', 'result': (founded, result, file_bytes),
                                 'key': data['key'], 'sender': [self.node.ID, self.node.ip, self.node.port] }
                     
-                    # client.sendall(json.dumps(answer).encode() + b'\r\n\r\n')
+                    # client.sendall(utils.dumps_json(answer).encode() + b'\r\n\r\n')
                     answer = utils.dumps_json(answer)
                     client.sendall(answer.encode() + b'\r\n\r\n')
                     if founded and result['value_type'] == 'file':
-                        files_bytes = utils.load_file(result['value'])
-                        self._send_file(files_bytes, data['sender'][1])
+                        # files_bytes = utils.load_file(result['value'])
+                        self._send_file(file_bytes, data['sender'][1])
 
                     if not Node.Equals(data['sender'], self.node):
                         self.update(data['sender'])
+                
+                elif data['method'] == 'UPDATE':
+                    self._update(data['store_key'], data['store_value'], data['publisher'], data['sender'])
 
         
         while True:
@@ -627,78 +643,72 @@ class Peer:
         self._close_socket(self.tcp_server)                
 
     def _update_peers_list(self, key, value, publisher, sender):
-        database = utils.load_file(self.node.storage)
+        key = str(key)
+        self.node.store_lock.acquire()
+        database = utils.load_json(self.node.storage)
         if key in database:
             if not isinstance(value, list): value = [value]
-            peers_to_check = set(database[key] + value)
+            peers_to_check = database[key]['value'] + value
+            peers_to_check = [tuple(v) for v in peers_to_check]
+            peers_to_check = list(set(peers_to_check))
+            # if not isinstance(peers_to_check, list): peers_to_check = [peers_to_check]
             
-            if list(peers_to_check) == database[key]: return # no update
+            # if peers_to_check == database[key]['value']: return # no update
             
-            alive_peers = []
-            for peer in peers_to_check:
-                sock = socket.socket()
-                try: 
-                    sock.connect((peer['ip'], peer['port']))
-                    alive_peers.append(peer)
-                except: pass
+            # alive_peers = []
+            # for peer in peers_to_check:
+            #     sock = socket.socket()
+            #     try: 
+            #         sock.connect((peer['ip'], peer['port']))
+            #         alive_peers.append(peer)
+            #     except: pass
             
-            database[key] = alive_peers
+            # database[key] = alive_peers
+            database[key]['value'] = peers_to_check
             utils.dump_json(database, self.node.storage)
+            self.node.store_lock.release()
         else:
-            self.node.STORE(key, value, publisher, sender)
+            self.node.store_lock.release()
+            self.node.STORE(key, value, publisher, sender, to_update=True)
 
-    def _update_names_dic(self, key, value, publisher, sender, existing=None):
+    def _update_names_dic(self, key, value, publisher, sender):
         key = str(key)
 
         database = utils.load_json(self.node.storage)
-        name, data_ID = value[0], value[1]
 
-        if data_ID not in database[key][name]: 
-            database[key][name].append(data_ID)
+        if key not in database: 
+            database[key] = {}
+            database[key]['value'] = value
+            database[key]['timeo'] = database[key]['timer'] = datetime.datetime.now()
+            database[key]['value_type'] = 'json'
+            database[key]['to_update'] = True
+        else:
+            for p in value:
+                if p not in database[key]['value']: 
+                    database[key]['value'][p] = value[p]
+                else:
+                    new_keys = database[key]['value'][p] + value[p]
+                    new_keys = list(set(new_keys))
+                    database[key]['value'][p] = new_keys
 
-        # if name == '': 
-        #     utils.dump_json(database, self.node.storage)
-        #     return
+            now = datetime.datetime.now()
+            if sender == publisher:
+                database[key]['timeo'] = now
 
-        # # If there is not the '' string remove some old keys
-        # to_drop = set()
-        # if name in database[key]:
-        #     if not existing: existing = set()
-        #     for k in database[key][name]:
-        #         if k in existing: continue
-
-        #         exist, _ = self.lookup_value(k)
-        #         if not exist: 
-        #             to_drop.add(k)
-        #         else:
-        #             existing.add(k)
-        
-        # # Remove old keys from all dic values
-        # for old_key in to_drop:
-        #     # patterns = list(database[key])
-        #     for pattern in database[key]:
-        #         try: database[key][pattern].remove(old_key)
-        #         except: pass
+            database[key]['timer'] = now
 
         utils.dump_json(database, self.node.storage)
-        return existing
     
     def _update(self, key, value, publisher, sender):
-        self.node.store_lock.acquire(True)
         # Updating names
 
-        if key == utils.INDEX_KEY: 
-            if not isinstance(value, list):
-                self._update_names_dic(key, value, publisher, sender)
-            else:
-                for v in value:
-                    self._update_names_dic(key, v, publisher, sender, existing)
+        if int(key) == utils.INDEX_KEY:
+            self.node.store_lock.acquire()
+            self._update_names_dic(key, value, publisher, sender) 
+            self.node.store_lock.release()
         else:
             # Updating peers list
-            self._update_peers_list(key, value, publisher, sender)
-
-        self.node.store_lock.release()
-        
+            self._update_peers_list(key, value, publisher, sender)        
 
 if __name__ == '__main__':
     import argparse
@@ -706,7 +716,7 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--udp_port', type=int, default=8000)
     parser.add_argument('-i', '--id', type=int, default=0)
     parser.add_argument('-s', '--tcp_server_port', type=int, default=9000)
-    parser.add_argument('-d', '--ip', type=str, default='192.168.43.144')
+    parser.add_argument('-d', '--ip', type=str, default='192.168.1.100')
 
     args = parser.parse_args()
 
