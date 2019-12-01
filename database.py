@@ -78,6 +78,7 @@ class Database:
 
             return value
 
+        if isinstance(ID, str): ID = utils.get_key(ID)
         sock = socket.socket() 
         try:
             sock.connect((self.contact))
@@ -124,6 +125,8 @@ class Database:
 
 
     def __setitem__(self, ID, assign):
+
+        if isinstance(ID, str): ID = utils.get_key(ID)
 
         value, name, to_update = assign
         if not isinstance(name, list): name = [name]
