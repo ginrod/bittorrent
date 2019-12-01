@@ -103,13 +103,13 @@ venv.bak/
 # mypy
 .mypy_cache/
 
+#directories
+downloaded
+
 # input files for testing
 *.txt
 *.json
 main.py
 lookup_debug
-<<<<<<< HEAD
 input.txt
-=======
 
->>>>>>> e8ab30725ab454daea715f162789501cf06a5239
