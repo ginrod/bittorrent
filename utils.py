@@ -3,18 +3,24 @@ import socket
 import time
 import json, datetime
 
+import torrent_parser
+import hashlib
+
 def parse_to_json(obj):
     if isinstance(obj, datetime.datetime):
         return [obj.year, obj.month, obj.day,
                 obj.hour, obj.minute, obj.second, obj.microsecond]
 
 def parse_from_json(database):
-    print(database)
     for k in database:
         database[k]['timeo'] = datetime.datetime(*(database[k]['timeo']))
         database[k]['timer'] = datetime.datetime(*(database[k]['timer']))
 
     return database
+
+
+def get_infohash(metainfo):
+    return hashlib.sha1(torrent_parser.encode(metainfo["info"])).hexdigest()
 
 
 def load_json(path):
@@ -31,6 +37,7 @@ def load_json(path):
 def dump_json(data, path):
     with open(path, 'w') as json_file:
         json.dump(data, json_file, default=parse_to_json)
+
 
 
 def build_PING_msg(sender):
@@ -60,6 +67,14 @@ def build_STORE_msg(key, value, sender):
 def generate_random_id():
     return uuid.uuid4().hex
 
+
+def load(name):
+    f = None
+    try:
+        f = open(name, "r+b")
+    except:
+        f = open(name, "wb")
+    return f
 
 
 # def sendall_to(msg, addr, socket, time_out=5):

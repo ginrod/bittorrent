@@ -111,5 +111,14 @@ downloaded
 *.json
 main.py
 lookup_debug
+<<<<<<< HEAD
 input.txt
 
+=======
+
+# Directories
+.vscode/
+downloaded
+files
+testing.py
+>>>>>>> 9154ecef5c2d239a82e66c468692dd8e0a885582

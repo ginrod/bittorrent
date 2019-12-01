@@ -2,6 +2,8 @@ import heapq
 import math
 import json
 import utils
+import datetime
+import threading
 
 class Node:
 
@@ -14,11 +16,11 @@ class Node:
         self.k = k
         self.B = B
 
-        self.storage = f'storage{ID}.json'
-
+        utils.create_dirs('files/storage')
+        self.storage = 'files/storage/storage.json'
 
         self.route_table = [[] for _ in range(B)]
-
+        self.store_lock = threading.Lock()
 
     def __repr__(self):
         return f'({self.ID}, {self.ip}, {self.port})'
@@ -36,7 +38,8 @@ class Node:
 
         r = ''
         for i in range(len(self.route_table)):
-            r += '[' + str(2**i) + ',' + str(2**(i + 1)) + '): ' + str(format(self.route_table[i])) + '\n'
+            r += '[' + str(2**i) + ',' + str(2**(i + 1)) + \
+                '): ' + str(format(self.route_table[i])) + '\n'
         print(r)
 
     def get_all_nodes(self, ID):
@@ -58,20 +61,40 @@ class Node:
         return self.ID ^ other[0]
 
     def FIND_VALUE(self, ID):
-
         data = utils.load_json(self.storage)
         if str(ID) in data:
             return (True, data[str(ID)])
         return (False, self.FIND_NODE(ID))
-
-    def STORE(self, key, value):
-        print(f'*******Value: {value}')
+    
+    def STORE(self, key, value, publisher, sender, value_type='json', real_value=None):
+        self.store_lock.acquire(True)
         key = str(key)
-        data = utils.load_json(self.storage)
-        data[key] = value
 
-        print(f'data to store: {data}')
-        utils.dump_json(data, self.storage)
+        database = utils.load_json(self.storage)
+        data = {'value': value }
+
+        if key in database:
+            data = database[key]
+            
+            # If the value to save is a file parm value is the path and real_value the file bytes array
+            if real_value: utils.save_file(value, real_value)
+
+            data['value'] = value
+            now = datetime.datetime.now()
+            if sender == publisher:
+                data['timeo'] = now
+
+            data['timer'] = now
+        else:
+            # If the value to save is a file parm value is the path and real_value the file bytes array
+            if real_value: utils.save_file(value, real_value)
+            data['publisher'] = publisher
+            data['timeo'] = data['timer'] = datetime.datetime.now()
+            data['value_type'] = value_type
+
+        database[key] = data
+        utils.dump_json(database, self.storage)
+        self.store_lock.release()
 
     def PING(self):
         return True
@@ -79,13 +102,12 @@ class Node:
     def FIND_NODE(self, ID):
         return self.get_n_closest(ID, self.k)
 
-
     def get_n_closest(self, ID, n):
         k_bucket, i = self.find_kBucket(ID)
         heap = []
-        n_closest = [ (ID ^ n[0], n) for n in heapq.nsmallest(n, k_bucket)]
-        inf, sup = i-1,i+1
-        while len(n_closest) < n and (inf >=0 or sup < self.B):
+        n_closest = [(ID ^ n[0], n) for n in heapq.nsmallest(n, k_bucket)]
+        inf, sup = i-1, i+1
+        while len(n_closest) < n and (inf >= 0 or sup < self.B):
             if inf >= 0:
                 heap += [(ID ^ n[0], n) for n in self.route_table[inf]]
                 inf -= 1
@@ -96,5 +118,21 @@ class Node:
             if len(n_closest) + len(heap) >= n:
                 for _ in range(n - len(n_closest)):
                     n_closest.append(heapq.heappop(heap))
-
+            
+        if len(n_closest) < n:
+            top = min(n - len(n_closest), len(heap))
+            for _ in range(top): 
+                n_closest.append(heapq.heappop(heap))
+        
         return n_closest
+
+    def asTuple(self):
+        return tuple(iter(self))
+        
+    def asList(self):
+        return list(iter(self))
+    
+    @staticmethod
+    def Equals(n1, n2):
+        n1, n2 = list(iter(n1)), list(iter(n2))
+        return n1[0] == n2[0] and n1[1] == n2[1] and n1[2] == n2[2]
