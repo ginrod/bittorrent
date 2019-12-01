@@ -682,6 +682,7 @@ class Peer:
             database[key]['timeo'] = database[key]['timer'] = datetime.datetime.now()
             database[key]['value_type'] = 'json'
             database[key]['to_update'] = True
+            database[key]['publisher'] = publisher
         else:
             for p in value:
                 if p not in database[key]['value']: 
