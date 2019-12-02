@@ -6,7 +6,6 @@ import flask
 
 import sys
 
-from utils import get_infohash
 from database import Database
 
 import json
@@ -14,6 +13,9 @@ import json
 def _print(text, flag='a'):
     with open("tracker_trace", flag) as f:
         f.write(f"{text}\n")
+
+def get_infohash(metainfo):
+    return hashlib.sha1(torrent_parser.encode(metainfo["info"])).hexdigest()
 
 class Tracker:
 

@@ -5,7 +5,7 @@ import socket
 import hashlib
 import os
 import time
-import utils
+import utils_client
 
 import http.client
 import urllib
@@ -31,7 +31,7 @@ class Peer:
         self.tcp_server.bind((self.ip, self.server_port))
         self.tcp_server.listen(256)
 
-        self.files = utils.load_json(f"files_shared{self.client_port}.json")
+        self.files = utils_client.load_json(f"files_shared{self.client_port}.json")
 
 
     def download(self, peers, metainfo):
@@ -40,7 +40,7 @@ class Peer:
                 infohash: 20-byte SHA1 hash of the info dictionary on the metainfo file
         """
 
-        infohash = utils.get_infohash(metainfo)
+        infohash = utils_client.get_infohash(metainfo)
 
         active_peers = [] #Peers of the peers list that are connected
 

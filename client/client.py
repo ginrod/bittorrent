@@ -7,7 +7,6 @@ from peer_wire_protocol import Peer
 import metainfo
 import json
 import sys
-import utils
 import urllib
 
 import threading
@@ -18,6 +17,9 @@ PIECE_LENGTH = 1024
 TRACKER_IP = "localhost"
 TRACKER_PORT = "5000"
 TRACKER_URL = f"{TRACKER_IP}:{TRACKER_PORT}"
+
+def get_infohash(metainfo):
+    return hashlib.sha1(torrent_parser.encode(metainfo["info"])).hexdigest()
 
 class Client:
 
@@ -42,7 +44,7 @@ class Client:
 
         params = {
             "name": metainfo["info"]["short_name"],
-            "infohash": utils.get_infohash(metainfo),
+            "infohash": get_infohash(metainfo),
 
             "peer_id": self.id,
             "ip": self.ip,
