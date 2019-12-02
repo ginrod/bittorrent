@@ -19,10 +19,8 @@ def get_infohash(metainfo):
 
 class Tracker:
 
-    def __init__(self, ip, port, request_interval=5, min_interval=5):
-        self.ip = ip
-        self.port = port
-        self.database = Database(ip, 5050)
+    def __init__(self, ip, port=5050, request_interval=5, min_interval=5):
+        self.database = Database(ip, port)
         # self._request_interval = request_interval
         # self._min_interval = min_interval
         # self._tracker_id = hashlib.sha1((str(os.getpid()) + str(time.time())).encode()).hexdigest()
@@ -74,7 +72,8 @@ app = flask.Flask(__name__)
 
 # DATABASE = {}
 
-TRACKER = Tracker("0.0.0.0", 8000)
+# TRACKER = Tracker("0.0.0.0", 8000)
+TRACKER = None
 
 @app.route('/announce')
 def announce():
@@ -130,4 +129,19 @@ def print_database():
 #     return flask.Response(response)
 
 if __name__ == "__main__":
+    import argparse, socket
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-ip', '--ip', type=str, default=None)
+    parser.add_argument('-port', '--port', type=int, default=5050)
+
+    args = parser.parse_args()
+    IP = args.ip
+    port = int(args.port)
+
+    if not IP:
+        hostname = socket.gethostname()    
+        IP = socket.gethostbyname(hostname)
+    
+    TRACKER = Tracker(IP, port)
+
     app.run(host="0.0.0.0", port=5000)

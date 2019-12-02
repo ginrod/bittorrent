@@ -1,4 +1,4 @@
-import socket, json, threading, time, utils
+import socket, json, threading, time, utils_tracker
 
 class Database:
 
@@ -66,7 +66,7 @@ class Database:
     def __getitem__(self, ID):
    
         def get(sock):
-            msg = utils.build_LOOKUP_msg(ID)
+            msg = utils_tracker.build_LOOKUP_msg(ID)
             sock.sendall(json.dumps(msg).encode() + b'\r\n\r\n')
             value = self._recvall(sock)
             founded = True
@@ -78,12 +78,12 @@ class Database:
 
             return value
 
-        if isinstance(ID, str): ID = utils.get_key(ID)
+        if isinstance(ID, str): ID = utils_tracker.get_key(ID)
         sock = socket.socket() 
         try:
             sock.connect((self.contact))
             value = get(sock)
-            utils.close_connection(sock)
+            utils_tracker.close_connection(sock)
             return value
         except Exception as ex:
             print(ex)
@@ -91,7 +91,7 @@ class Database:
             sock.connect((self.contact))
         
         value = get(sock)
-        utils.close_connection(sock)
+        utils_tracker.close_connection(sock)
         return value
 
     def _send_bytes(self, bytes_array):
@@ -101,7 +101,7 @@ class Database:
         sock.close()
 
     def _setnames(self, name, ID):
-        strings = utils.get_substrings(name)
+        strings = utils_tracker.get_substrings(name)
         for s in strings:
             self._setname(s, ID)
 
@@ -109,7 +109,7 @@ class Database:
         sock = socket.socket()
         
         def post():
-            msg = utils.build_PUBLISH_msg(utils.INDEX_KEY, (name, ID), to_update=True)
+            msg = utils_tracker.build_PUBLISH_msg(utils_tracker.INDEX_KEY, (name, ID), to_update=True)
             sock.sendall(json.dumps(msg).encode())
             
         try:
@@ -121,12 +121,12 @@ class Database:
             sock.connect((self.contact))
             post()
         
-        utils.close_connection(sock)
+        utils_tracker.close_connection(sock)
 
 
     def __setitem__(self, ID, assign):
 
-        if isinstance(ID, str): ID = utils.get_key(ID)
+        if isinstance(ID, str): ID = utils_tracker.get_key(ID)
 
         value, name, to_update = assign
         if not isinstance(name, list): name = [name]
@@ -136,12 +136,12 @@ class Database:
             msg, is_json_serializable = None, True
             is_file = False
             try:
-                msg = utils.build_PUBLISH_msg(ID, value, to_update=to_update)
+                msg = utils_tracker.build_PUBLISH_msg(ID, value, to_update=to_update)
                 msg = json.dumps(msg).encode()
             except TypeError:
                 is_json_serializable = False
                 path = f'files/storage/files/{name[0]}'
-                msg = utils.build_PUBLISH_msg(ID, path, 'file', to_update)
+                msg = utils_tracker.build_PUBLISH_msg(ID, path, 'file', to_update)
                 msg = json.dumps(msg).encode()
                 is_file = True
                 
@@ -150,11 +150,11 @@ class Database:
                 self._send_bytes(value)
             
             if is_file:
-                patterns = list(utils.get_substrings(name[0])) + name[1:]
+                patterns = list(utils_tracker.get_substrings(name[0])) + name[1:]
                 patterns = list(set(patterns))
                 store_value = { p:[ID] for p in patterns }
-                # msg = utils.build_PUBLISH_msg(utils.INDEX_KEY, (ID, patterns), to_update=True)
-                msg = utils.build_PUBLISH_msg(utils.INDEX_KEY, store_value, to_update=True)
+                # msg = utils_tracker.build_PUBLISH_msg(utils_tracker.INDEX_KEY, (ID, patterns), to_update=True)
+                msg = utils_tracker.build_PUBLISH_msg(utils_tracker.INDEX_KEY, store_value, to_update=True)
                 msg = json.dumps(msg).encode()
                 sock.sendall(msg + b'\r\n\r\n')
             
@@ -168,11 +168,11 @@ class Database:
             sock.connect((self.contact))
             post()
         
-        utils.close_connection(sock)
+        utils_tracker.close_connection(sock)
 
     def find_keys_by_name(self, name):
         def get(sock):
-            msg = utils.build_LOOKUP_msg(utils.INDEX_KEY)
+            msg = utils_tracker.build_LOOKUP_msg(utils_tracker.INDEX_KEY)
             sock.sendall(json.dumps(msg).encode() + b'\r\n\r\n')
             value = self._recvall(sock)
             founded = True
@@ -187,20 +187,20 @@ class Database:
         try:
             sock.connect((self.contact))
             value = get(sock)
-            utils.close_connection(sock)
+            utils_tracker.close_connection(sock)
             return value[name]
         except:
             self.get_connection()
             sock.connect((self.contact))
         
         value = get(sock)
-        utils.close_connection(sock)
+        utils_tracker.close_connection(sock)
         return value[name]
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input', type=str, default='127.0.0.1')
+    parser.add_argument('-ip', '--input', type=str, default='127.0.0.1')
     parser.add_argument('-p', '--port', type=int, default=5000)
 
     args = parser.parse_args()
@@ -213,12 +213,12 @@ if __name__ == "__main__":
     s = time.time()
     # print(s)
     database = Database(IP, args.port)
-    # database[2] = utils.assign('AL FIN PINCHA')
+    # database[2] = utils_tracker.assign('AL FIN PINCHA')
     # print(database[2])
-    # database[4] = utils.assign('Dato 4')
-    # database[3] = utils.assign('Dato 3')
-    # database[6] = utils.assign(('Dato 6', True, 'soy una tupla :-)'))
-    # database[5] = utils.assign('Dato 5')
+    # database[4] = utils_tracker.assign('Dato 4')
+    # database[3] = utils_tracker.assign('Dato 3')
+    # database[6] = utils_tracker.assign(('Dato 6', True, 'soy una tupla :-)'))
+    # database[5] = utils_tracker.assign('Dato 5')
     # print(f'5:{database[5]}')
     # print(f'6:{database[6]}')
     # print(f'3:{database[3]}')
@@ -227,11 +227,11 @@ if __name__ == "__main__":
     with open('files/torrents/real.torrent', 'rb') as f:
         data = f.read()
 
-    # database[7] = utils.assign(data, name='real.torrent')
-    # database[6] = utils.assign([('127.0.0.1', 8080, -1)], to_update=True)
-    # database[6] = utils.assign([('127.0.0.1', 8081, -2)], to_update=True)
-    # database[5] = utils.assign([('192.0.0.1', 8080, -1)], to_update=True)
-    # database[5] = utils.assign([('192.0.0.1', 8081, -2)], to_update=True)
+    # database[7] = utils_tracker.assign(data, name='real.torrent')
+    # database[6] = utils_tracker.assign([('127.0.0.1', 8080, -1)], to_update=True)
+    # database[6] = utils_tracker.assign([('127.0.0.1', 8081, -2)], to_update=True)
+    # database[5] = utils_tracker.assign([('192.0.0.1', 8080, -1)], to_update=True)
+    # database[5] = utils_tracker.assign([('192.0.0.1', 8081, -2)], to_update=True)
 
     loaded = database[7]
     equals = data == loaded

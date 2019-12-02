@@ -7,7 +7,7 @@ import heapq
 import math
 from protocol import Node
 import threading, random
-from database import Database
+# from database import Database
 
 import sys
 
@@ -802,7 +802,7 @@ if __name__ == '__main__':
         hostname = socket.gethostname()
         IP = socket.gethostbyname(hostname)
 
-    node = Node(ID, IP, int(args.udp_port), B=4, k=2, alpha=2)
+    node = Node(ID, IP, int(args.udp_port), B=160, k=20, alpha=3)
     peer = Peer(node, int(args.tcp_server_port))
 
     threading._start_new_thread(peer.join, ())

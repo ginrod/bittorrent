@@ -108,7 +108,7 @@ class Client:
         self._print(f"downloaded successfully: {_metainfo['info']['short_name']}{_metainfo['info']['extension']}")
         connection.close()
 
-    def share(self, paths, mode="single-file", root_name=""):
+    def share(self, path, mode="single-file", root_name=""):
         #create the .torrent
         _metainfo = metainfo.create_metainfo([path], TRACKER_URL)
         _metainfo_encoded = torrent_parser.encode(_metainfo)
@@ -140,9 +140,19 @@ def concat(command):
 
 if __name__ == "__main__":
 
-    #truncate the history
-    # with open("history", "w") as h:
-    #     pass
+    import argparse, socket
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-port', '--port', type=int, default=7000)
+    parser.add_argument('-ip', '--ip', type=str, default=None)
+
+    args = parser.parse_args()
+
+    ip = args.ip
+    port = int(args.port)
+
+    if not ip:
+        hostname = socket.gethostname()
+        ip = socket.gethostbyname(hostname)
 
     paths = ["/home/tony/Desktop/Orientación del proyecto/COOL Language Reference Manual.pdf",
             "/media/tony/01D54288CC477C00/Escuela/Música Estudiar, Música Relajante para Reducir Estres, Música para Trabajar, Estudiar, ☯3043.mp4",
@@ -163,22 +173,30 @@ if __name__ == "__main__":
 	        "The Lion King [El Rey Leon] [2019] [1080p] [Dual Audio]", "El Club de Los Incomprendidos [2014]"
             ]
 
-    ip = "localhost"
-    port = int(input("port:"))
+    # ip = "localhost"
+    # port = int(input("port:"))
     c = Client(ip, port)
 
     while True:
-        command = input(">>>").split()
-        if not command:
-            continue
-        elif command[0] == "share":
-            if len(command == 2):
-                c.share(int(command[1]))
-            else:
-                c.share([int(p) for p in command[2:]], root_name=command[1])
-        elif command[0] == "get":
-            c.download(names[int(command[1])])
-        elif command[0] == "exit":
+        op, param = input('>>>').split('|')
+        if op == 'share':
+            c.share(param)
+        elif op == 'get':
+            c.download(param)
+        elif op == 'exit':
             break
-        else:
-            continue
+
+        # command = input(">>>").split()
+        # if not command:
+        #     continue
+        # elif command[0] == "share":
+        #     if len(command == 2):
+        #         c.share(int(command[1]))
+        #     else:
+        #         c.share([int(p) for p in command[2:]], root_name=command[1])
+        # elif command[0] == "get":
+        #     c.download(names[int(command[1])])
+        # elif command[0] == "exit":
+        #     break
+        # else:
+        #     continue
