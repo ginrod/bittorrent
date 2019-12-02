@@ -1,6 +1,6 @@
 import torrent_parser
 import hashlib, os, time
-import errors
+
 
 import flask
 
@@ -81,9 +81,9 @@ def announce():
 @app.route('/have/<client_id>/<ip>/<port>/<portion>/<name>/<infohash>', methods=["PUT"])
 def have(client_id, ip, port, portion, name, infohash):
     if portion == "complete":
-        TRACKER.database[name][infohash]["peers_complete"].append({"ip": ip, "port": int(port), "id": id})
+        TRACKER.database[name][infohash]["peers_complete"].append({"ip": ip, "port": int(port), "id": client_id})
     else:
-        TRACKER.database[name][infohash]["peers_incomplete"].append({"ip": ip, "port": int(port), "id": id})
+        TRACKER.database[name][infohash]["peers_incomplete"].append({"ip": ip, "port": int(port), "id": client_id})
     return ""
 
 @app.route('/search')

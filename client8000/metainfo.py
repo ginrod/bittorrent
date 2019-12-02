@@ -8,6 +8,7 @@ def generate_hash(piece, hash_func):
 
 def generate_pieces(paths, piece_length):
     pieces = []
+    i = 0
     for path in paths:
         with open(path, "rb") as file:
             while True:
@@ -15,6 +16,8 @@ def generate_pieces(paths, piece_length):
                 if not piece:
                     break
                 pieces.append(generate_hash(piece, hashlib.sha1))
+                print(f"Piece {i} generated")
+                i += 1
     return pieces
 
 def choose_piece_length(file_size):
@@ -30,7 +33,7 @@ def choose_piece_length(file_size):
 
     return piece_length
 
-def create_metainfo(paths, announce, announce_list=[], mode="single-file", encoding="utf-8", comment="", created_by=""):
+def create_metainfo(paths, announce, announce_list=[], mode="single-file", encoding="utf-8", comment="", created_by="", multiple_file_name="torent_files"):
     size = os.stat(paths[0]).st_size
     # piece_length = choose_piece_length(size)
     piece_length = MAX_PIECE_SIZE
@@ -71,6 +74,9 @@ def create_metainfo(paths, announce, announce_list=[], mode="single-file", encod
             with open(path) as f:
                 files.append({'path': path, 'length': os.stat(path).st_size})
         metainfo["info"]["files"] = files
+
+        metainfo["info"]["short_name"] = multiple_file_name
+        metainfo['info']['extension'] = ""
 
     else: raise Exception("Invalid file mode")
 
