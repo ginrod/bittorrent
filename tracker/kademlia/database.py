@@ -23,7 +23,7 @@ class Database:
 
         # Set socket as server
         server = socket.socket()
-        # server.settimeout()
+        server.settimeout(0.5)
         # try:    
         server.bind(('', self.port))
         # except Exception as ex:
@@ -41,9 +41,9 @@ class Database:
         while not self.contact:
             try : 
                 self.find_contact()
-            except Exception as ex: 
+            except: 
                 pass
-            time.sleep(1)
+            time.sleep(0.5)
 
     def _recvall(self, sock):
         data = b''
@@ -78,13 +78,15 @@ class Database:
 
             return value
 
+        if isinstance(ID, str): ID = utils.get_key(ID)
         sock = socket.socket() 
         try:
             sock.connect((self.contact))
             value = get(sock)
             utils.close_connection(sock)
             return value
-        except:
+        except Exception as ex:
+            print(ex)
             self.get_connection()
             sock.connect((self.contact))
         
@@ -114,6 +116,7 @@ class Database:
             sock.connect((self.contact))
             post()            
         except Exception as ex:
+            print(ex)
             self.get_connection()
             sock.connect((self.contact))
             post()
@@ -123,6 +126,8 @@ class Database:
 
     def __setitem__(self, ID, assign):
 
+        if isinstance(ID, str): ID = utils.get_key(ID)
+
         value, name, to_update = assign
         if not isinstance(name, list): name = [name]
         sock = socket.socket()
@@ -131,12 +136,12 @@ class Database:
             msg, is_json_serializable = None, True
             is_file = False
             try:
-                msg = utils.build_PUBLISH_msg(ID, value, to_update)
+                msg = utils.build_PUBLISH_msg(ID, value, to_update=to_update)
                 msg = json.dumps(msg).encode()
             except TypeError:
                 is_json_serializable = False
                 path = f'files/storage/files/{name[0]}'
-                msg = utils.build_PUBLISH_msg(ID, path, 'file')
+                msg = utils.build_PUBLISH_msg(ID, path, 'file', to_update)
                 msg = json.dumps(msg).encode()
                 is_file = True
                 
@@ -145,13 +150,20 @@ class Database:
                 self._send_bytes(value)
             
             if is_file:
-                patterns = utils.get_substrings(name[0]) + name[1:]
-                msg = utils.build_PUBLISH_msg(utils.INDEX_KEY, (patterns, key), to_update=True)
+                patterns = list(utils.get_substrings(name[0])) + name[1:]
+                patterns = list(set(patterns))
+                store_value = { p:[ID] for p in patterns }
+                # msg = utils.build_PUBLISH_msg(utils.INDEX_KEY, (ID, patterns), to_update=True)
+                msg = utils.build_PUBLISH_msg(utils.INDEX_KEY, store_value, to_update=True)
+                msg = json.dumps(msg).encode()
+                sock.sendall(msg + b'\r\n\r\n')
             
+            sock.close()
+
         try:
             sock.connect((self.contact))
             post()            
-        except Exception as ex:
+        except:
             self.get_connection()
             sock.connect((self.contact))
             post()
@@ -194,6 +206,40 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # start(args.input)
-    database = Database('127.0.0.1', args.port)
-    # database[1] = 'Hello'
-    print(database[1])
+    hostname = socket.gethostname()    
+    IP = socket.gethostbyname(hostname)
+    # IP = '192.168.43.144'
+    import time
+    s = time.time()
+    # print(s)
+    database = Database(IP, args.port)
+    # database[2] = utils.assign('AL FIN PINCHA')
+    # print(database[2])
+    # database[4] = utils.assign('Dato 4')
+    # database[3] = utils.assign('Dato 3')
+    # database[6] = utils.assign(('Dato 6', True, 'soy una tupla :-)'))
+    # database[5] = utils.assign('Dato 5')
+    # print(f'5:{database[5]}')
+    # print(f'6:{database[6]}')
+    # print(f'3:{database[3]}')
+    # print(f'4:{database[4]}')
+    data = []
+    with open('files/torrents/real.torrent', 'rb') as f:
+        data = f.read()
+
+    # database[7] = utils.assign(data, name='real.torrent')
+    # database[6] = utils.assign([('127.0.0.1', 8080, -1)], to_update=True)
+    # database[6] = utils.assign([('127.0.0.1', 8081, -2)], to_update=True)
+    # database[5] = utils.assign([('192.0.0.1', 8080, -1)], to_update=True)
+    # database[5] = utils.assign([('192.0.0.1', 8081, -2)], to_update=True)
+
+    loaded = database[7]
+    equals = data == loaded
+
+
+    print(equals)
+    # import threading
+
+    # threading.Thread()
+
+    print('Resultado(s) obtenido en', time.time() - s, ' segundos')

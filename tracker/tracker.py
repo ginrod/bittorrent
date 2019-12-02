@@ -1,12 +1,13 @@
 import torrent_parser
 import hashlib, os, time
-import errors
+
 
 import flask
 
 import sys
 
 from utils import get_infohash
+from database import Database
 
 import json
 
@@ -16,10 +17,10 @@ def _print(text, flag='a'):
 
 class Tracker:
 
-    def __init__(self, ip, port, database, request_interval=5, min_interval=5):
+    def __init__(self, ip, port, request_interval=5, min_interval=5):
         self.ip = ip
         self.port = port
-        self.database = database
+        self.database = Database(ip, 5050)
         # self._request_interval = request_interval
         # self._min_interval = min_interval
         # self._tracker_id = hashlib.sha1((str(os.getpid()) + str(time.time())).encode()).hexdigest()
@@ -69,9 +70,9 @@ class Tracker:
 
 app = flask.Flask(__name__)
 
-DATABASE = {}
+# DATABASE = {}
 
-TRACKER = Tracker("0.0.0.0", 8000, DATABASE)
+TRACKER = Tracker("0.0.0.0", 8000)
 
 @app.route('/announce')
 def announce():
@@ -81,9 +82,9 @@ def announce():
 @app.route('/have/<client_id>/<ip>/<port>/<portion>/<name>/<infohash>', methods=["PUT"])
 def have(client_id, ip, port, portion, name, infohash):
     if portion == "complete":
-        TRACKER.database[name][infohash]["peers_complete"].append({"ip": ip, "port": int(port), "id": id})
+        TRACKER.database[name][infohash]["peers_complete"].append({"ip": ip, "port": int(port), "id": client_id})
     else:
-        TRACKER.database[name][infohash]["peers_incomplete"].append({"ip": ip, "port": int(port), "id": id})
+        TRACKER.database[name][infohash]["peers_incomplete"].append({"ip": ip, "port": int(port), "id": client_id})
     return ""
 
 @app.route('/search')
