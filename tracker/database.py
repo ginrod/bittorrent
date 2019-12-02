@@ -146,6 +146,7 @@ class Database:
                 is_file = True
                 
             sock.sendall(msg + b'\r\n\r\n')
+            # print(f'SENDING MSG:\n{msg}')
             if not is_json_serializable:
                 self._send_bytes(value)
             
@@ -156,7 +157,11 @@ class Database:
                 # msg = utils_tracker.build_PUBLISH_msg(utils_tracker.INDEX_KEY, (ID, patterns), to_update=True)
                 msg = utils_tracker.build_PUBLISH_msg(utils_tracker.INDEX_KEY, store_value, to_update=True)
                 msg = json.dumps(msg).encode()
-                sock.sendall(msg + b'\r\n\r\n')
+                sock2 = socket.socket()
+                sock2.connect((self.contact)) 
+                sock2.sendall(msg + b'\r\n\r\n')
+                sock2.close()
+                # print(f'SENDING MSG:\n{msg}')
             
             sock.close()
 

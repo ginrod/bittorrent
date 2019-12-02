@@ -15,15 +15,15 @@ INDEX_KEY = 10
 
 def resetable(F):
     def wrapper(inst):
-        while True:
-            try:
-                F(inst)
-            except (Exception, KeyboardInterrupt) as ex:
-                if isinstance(ex, KeyboardInterrupt):
-                    print('NODO INTERRUMPIDO')
-                    break
-                print('EL NODO SE HA REINICIADO DEBIDO A UNA EXCEPCIÓN')
-                print(ex)
+        # while True:
+            # try:
+        F(inst)
+            # except (Exception, KeyboardInterrupt) as ex:
+            #     if isinstance(ex, KeyboardInterrupt):
+            #         print('NODO INTERRUMPIDO')
+            #         break
+            #     print('EL NODO SE HA REINICIADO DEBIDO A UNA EXCEPCIÓN')
+            #     print(ex)
 
     return wrapper
 
@@ -238,6 +238,9 @@ class Peer:
             if datetime.datetime.now() - data['timer'] >= datetime.timedelta(seconds=10):
             # if datetime.datetime.now() - data['timer'] >= datetime.timedelta(seconds=1):
             # if datetime.datetime.now() - data['timer'] >= datetime.timedelta(hours=1):
+
+                if key == 313739178002997716893868377970529607482382768949 or key == '313739178002997716893868377970529607482382768949':
+                    pa_entrar_aqui = True
 
                 # Republishing
                 # self.publish(data, data['publisher'], self.node.asTuple())
@@ -593,9 +596,11 @@ class Peer:
         def attend(client):
             while True:
                 msg = self.recvall(client)
+
                 if not msg:
                     break
-
+                
+                # print(f'RECEIVED MSG {msg}')
                 data = {'method': None}
                 try:
                     data = json.loads(msg)
@@ -686,33 +691,32 @@ class Peer:
 
     def _update_peers_list(self, key, value, publisher, sender):
         key = str(key)
+
+        if key == '313739178002997716893868377970529607482382768949':
+            foo = 8
+
         self.node.store_lock.acquire()
         database = utils.load_json(self.node.storage)
+        # print(f'UPDATING {key}:{value}')
         if key in database:
             if not isinstance(value, list): value = [value]
-            peers_to_check = database[key]['value'] + value
-            peers_to_check = [tuple(v) for v in peers_to_check]
-            peers_to_check = list(set(peers_to_check))
-            # if not isinstance(peers_to_check, list): peers_to_check = [peers_to_check]
-
-            # if peers_to_check == database[key]['value']: return # no update
-
-            # alive_peers = []
-            # for peer in peers_to_check:
-            #     sock = socket.socket()
-            #     try:
-            #         sock.connect((peer['ip'], peer['port']))
-            #         alive_peers.append(peer)
-            #     except: pass
-
-            # database[key] = alive_peers
-            database[key]['value'] = peers_to_check
+            # peers_to_check = database[key]['value'] + value
+            # # peers_to_check = [tuple(v) for v in peers_to_check]
+            # peers_to_check = list(set(peers_to_check))
+            # to_drop = set()
+            # for el
+            ids = set([dic['id'] for dic in database[key]['value']])
+            for dic in value:
+                if dic['id'] not in ids:
+                    database[key]['value'].append(dic)
+                    
             utils.dump_json(database, self.node.storage)
             self.node.store_lock.release()
         else:
             self.node.store_lock.release()
             if not isinstance(value, list): value = [value]
             self.node.STORE(key, value, publisher, sender, to_update=True)
+            foo = 0
 
     def _update_names_dic(self, key, value, publisher, sender):
         key = str(key)

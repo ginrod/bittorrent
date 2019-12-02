@@ -118,8 +118,11 @@ def metainfo(client_id, ip, port):
         print(f'NAME: {name}')
         ID = name + infohash + "peers"
         hashed = utils_tracker.get_key(ID)
+        # print('SETTING metainfo')
         TRACKER.database[name + infohash + "metainfo"] = utils_tracker.assign(metainfo_decoded, name)
         
+
+        # print('SETTING peers list')
         TRACKER.database[name + infohash + "peers"] = utils_tracker.assign({"ip": ip, "port": int(port), "id": client_id}, to_update=True)
         # TRACKER.database[name + infohash + "peers_incomplete"] = []
 
