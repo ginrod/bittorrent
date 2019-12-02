@@ -7,11 +7,25 @@ import heapq
 import math
 from protocol import Node
 import threading, random
-from database import Database
+# from database import Database
 
 import sys
 
 INDEX_KEY = 10
+
+def resetable(F):
+    def wrapper(inst):
+        while True:
+            try:
+                F(inst)
+            except (Exception, KeyboardInterrupt) as ex:
+                if isinstance(ex, KeyboardInterrupt):
+                    print('NODO INTERRUMPIDO')
+                    break
+                print('EL NODO SE HA REINICIADO DEBIDO A UNA EXCEPCIÓN')
+                print(ex)
+
+    return wrapper
 
 class Peer:
 
@@ -35,6 +49,7 @@ class Peer:
         # utils.create_dirs('files/storage/files')
         self.recvfile_lock = threading.Lock()
 
+    @resetable
     def serve(self):
         print('Peer with ID ' + str(self.node.ID) + " serving at : " +  str(self.node.ip) + ":" + str(self.node.port))
 
@@ -247,6 +262,7 @@ class Peer:
         self.node.store_lock.release()
 
 
+    @resetable
     def check_network(self, time_unit=1):
 
         while True:
@@ -497,6 +513,7 @@ class Peer:
             sock.sendto(broadcast_msg, ('255.255.255.255', 8080))
             # sock.sendto(broadcast_msg, ('255.255.255.255', 8081))
 
+    @resetable
     def join(self):
         def has_contact(p):
             for kBucket in p.node.route_table:
@@ -570,6 +587,7 @@ class Peer:
 
         return msg
 
+    @resetable
     def attend_clients(self):
 
         def attend(client):
@@ -648,6 +666,7 @@ class Peer:
             c, _ = self.tcp_server.accept()
             threading._start_new_thread(attend, (c,))
 
+    @resetable
     def attend_new_nodes(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         # sock.bind(('', 8080))
@@ -769,10 +788,10 @@ class Peer:
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('-p', '--udp_port', type=int, default=8000)
-    parser.add_argument('-i', '--id', type=int, default=0)
-    parser.add_argument('-s', '--tcp_server_port', type=int, default=9000)
-    parser.add_argument('-d', '--ip', type=str, default=None)
+    parser.add_argument('-uport', '--udp_port', type=int, default=8000)
+    parser.add_argument('-id', '--id', type=int, default=0)
+    parser.add_argument('-tport', '--tcp_server_port', type=int, default=9000)
+    parser.add_argument('-ip', '--ip', type=str, default=None)
 
     args = parser.parse_args()
 
@@ -783,7 +802,7 @@ if __name__ == '__main__':
         hostname = socket.gethostname()
         IP = socket.gethostbyname(hostname)
 
-    node = Node(ID, IP, int(args.udp_port), B=4, k=2, alpha=2)
+    node = Node(ID, IP, int(args.udp_port), B=160, k=20, alpha=3)
     peer = Peer(node, int(args.tcp_server_port))
 
     threading._start_new_thread(peer.join, ())
