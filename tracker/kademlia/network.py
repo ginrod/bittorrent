@@ -788,10 +788,10 @@ class Peer:
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('-p', '--udp_port', type=int, default=8000)
-    parser.add_argument('-i', '--id', type=int, default=0)
-    parser.add_argument('-s', '--tcp_server_port', type=int, default=9000)
-    parser.add_argument('-d', '--ip', type=str, default=None)
+    parser.add_argument('-uport', '--udp_port', type=int, default=8000)
+    parser.add_argument('-id', '--id', type=int, default=0)
+    parser.add_argument('-tport', '--tcp_server_port', type=int, default=9000)
+    parser.add_argument('-ip', '--ip', type=str, default=None)
 
     args = parser.parse_args()
 
