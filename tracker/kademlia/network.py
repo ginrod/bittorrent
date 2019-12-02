@@ -28,11 +28,11 @@ def resetable(F):
     return wrapper
 
 class Peer:
-    
+
     def __init__(self, node, tcp_server_port=9000):
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.udp_socket.bind((node.ip, node.port))
-        
+
         self.lock = threading.Lock()
         self.node = node
         self.reponses = {}
@@ -60,7 +60,7 @@ class Peer:
 
                 if msg is not None:
                     data = json.loads(msg)
-                    
+
                     if data['key'] in self.received_msgs:
                         continue
                     else:
@@ -68,7 +68,7 @@ class Peer:
 
                     addr = data['sender'][1], data['sender'][2]
                     threading._start_new_thread(self.proccess_message, (data, addr))
-                
+
                 self.node.print_routing_table()
         except KeyboardInterrupt:
             self.__del__()
@@ -78,14 +78,14 @@ class Peer:
         if data['operation'] != 'DISCOVER':
             print("Data received: " + str(data))
 
-        if data['operation'] == 'DISCOVER': 
+        if data['operation'] == 'DISCOVER':
             if data['join']:
                 # addr = str(data['sender'][1]), int(data['sender'][2])
                 if addr != (self.node.ip, self.node.port):
                     answer = { 'operation': 'CONTACT', 'sender': list(self.node),
                             'key': data['key'] }
-                    
-                    self.send_udp_msg(utils.dumps_json(answer).encode(), addr)
+
+                    self.send_udp_msg(json.dumps(answer).encode(), addr)
                     self.update(tuple(data['sender']))
             else:
                 if addr != (self.node.ip, self.node.port):
@@ -97,7 +97,7 @@ class Peer:
         elif data['operation'] == 'CONTACT':
             contact = tuple(data['sender'])
             self.update(contact)
-            threading._start_new_thread(self.lookup_node, (self.node.ID, ))    
+            threading._start_new_thread(self.lookup_node, (self.node.ID, ))
 
         # A peer has to perform a method specified by other peer by RPC
         elif data['operation'] == 'EXECUTE':
@@ -163,7 +163,7 @@ class Peer:
     def publish(self, data, publisher, sender, file_bytes=None):
         if data['value_type'] == 'file' and not file_bytes:
             file_bytes = self.recv_file()
-        
+
         k_closest = [n for _, n in self.lookup_node(data['store_key'])]
         for node in k_closest:
             if data['to_update']:
@@ -174,7 +174,7 @@ class Peer:
             self.sendall(msg, node[1])
             if data['value_type'] == 'file':
                 threading._start_new_thread(self._send_file, (file_bytes, node[1]))
-        
+
         return k_closest
 
     def _send_file(self, file_bytes, ip):
@@ -221,9 +221,9 @@ class Peer:
 
         my_local_database = utils.load_json(self.node.storage)
         keys_to_drop = set()
-        
-        # database = Database(self.node.ip, 5050, contact=(self.node.ip, self.tcp_server_port)) 
-        # database = Database(self.node.ip, 5050, contact=(self.node.ip, 9000)) 
+
+        # database = Database(self.node.ip, 5050, contact=(self.node.ip, self.tcp_server_port))
+        # database = Database(self.node.ip, 5050, contact=(self.node.ip, 9000))
         for key, data in my_local_database.items():
             original_republish = True if datetime.datetime.now() - data['timeo'] < datetime.timedelta(seconds=240) else False
             # original_republish = True if datetime.datetime.now() - data['timeo'] < datetime.timedelta(seconds=24) else False
@@ -244,19 +244,19 @@ class Peer:
                 file_bytes = None
                 if data['value_type'] == 'file':
                     file_bytes = utils.load_file(data['value'])
-                
+
                 msg = utils.build_PUBLISH_msg(key, data['value'], data['value_type'], data['to_update'])
 
                 k_closest = self.publish(msg, data['publisher'], self.node.asTuple(), file_bytes)
                 if self.node.asTuple() not in k_closest:
                     keys_to_drop.add(key)
                 # if data['value_type']
-        
+
         self.node.store_lock.acquire()
         my_local_database = utils.load_json(self.node.storage)
         for key in keys_to_drop:
             my_local_database.pop(key)
-        
+
         # if my_local_database:
         utils.dump_json(my_local_database, self.node.storage)
         self.node.store_lock.release()
@@ -320,7 +320,7 @@ class Peer:
         self.lock.acquire()
         if self.kBucketRefreshTimes[idx] >= t: return
         self.kBucketRefreshTimes[idx] = t
-        self.lock.release()            
+        self.lock.release()
 
     def lookup_node(self, ID):
         ID = int(ID)
@@ -366,7 +366,7 @@ class Peer:
 
                 if (d,n) not in enquired:
                     enquired.append((d, n))
-                
+
                 if data != None and (d,n) not in alives:
                     alives.append((d, n))
 
@@ -436,7 +436,7 @@ class Peer:
 
                 if (d,n) not in enquired:
                     enquired.append((d, n))
-                
+
                 if data != None and (d,n) not in alives:
                     alives.append((d, n))
 
@@ -491,9 +491,9 @@ class Peer:
         self.lock.acquire()
         self.reponses[key] = value
         self.lock.release()
-    
+
     def delete_response(self, key, timeout=2.5):
-        self.lock.acquire()        
+        self.lock.acquire()
         self.reponses.pop(key)
         self.lock.release()
 
@@ -516,14 +516,14 @@ class Peer:
     @resetable
     def join(self):
         def has_contact(p):
-            for kBucket in p.node.route_table: 
+            for kBucket in p.node.route_table:
                 if len(kBucket) > 0: return True
             return False
 
-        while not has_contact(self): 
+        while not has_contact(self):
             self.discover()
             time.sleep(1)
-        
+
         self.node.print_routing_table()
 
     def sendall(self, msg, ip, port=9000, close=True):
@@ -545,15 +545,15 @@ class Peer:
         sock.bind((self.node.ip, 9090))
         sock.listen(1)
         sender, _ = sock.accept()
-        
-        data = b'' 
+
+        data = b''
         while True:
             # chunk = sender.recv(1024)
             chunk = sender.recv(4096)
             if not chunk:
                 break
             data += chunk
-        
+
         sender.close()
         sock.close()
 
@@ -561,19 +561,19 @@ class Peer:
         return data
 
     def recvall(self, client):
-        
+
         def recv():
             data = b''
-            while True: 
+            while True:
                 chunk = client.recv(1024)
-                if not chunk: 
+                if not chunk:
                     break
-                
+
                 if chunk.endswith(b'\r\n\r\n'):
                     data += chunk[0:-4]
                     # data = chunk.replace(b'\r\n\r\n', b'')
                     break
-                
+
                 data += chunk
 
             return data
@@ -584,22 +584,22 @@ class Peer:
         try:
             msg = recv()
         except: pass
-        
+
         return msg
 
     @resetable
     def attend_clients(self):
-        
+
         def attend(client):
             while True:
                 msg = self.recvall(client)
                 if not msg:
                     break
-                
+
                 data = {'method': None}
-                try: 
+                try:
                     data = json.loads(msg)
-                except: 
+                except:
                     pass
 
                 if data['method'] == 'PUBLISH':
@@ -610,7 +610,7 @@ class Peer:
 
                     founded, result, file_bytes = answer[0], answer[1], answer[2]
                     if founded and result['value_type'] == 'file':
-                        
+
                         if not file_bytes: file_bytes = self.recv_file()
                         # try: client.sendall(file_bytes)
                         # except: pass
@@ -625,18 +625,18 @@ class Peer:
                 elif data['method'] == 'STORE':
                     key, value = data['store_key'], data['store_value']
                     publisher, sender = tuple(data['publisher']), tuple(data['sender'])
-                    
+
                     real_value = None
                     if data['value_type'] == 'file':
                         real_value = self.recv_file()
-                    
+
                     self.node.STORE(key, value, publisher, sender, data['value_type'], real_value, data['to_update'])
 
                 elif data['method'] == 'FIND_VALUE':
                     founded, result, file_bytes = self.node.FIND_VALUE(data['id'])
                     answer = {'operation': 'RESPONSE', 'result': (founded, result, file_bytes),
                                 'key': data['key'], 'sender': [self.node.ID, self.node.ip, self.node.port] }
-                    
+
                     # client.sendall(utils.dumps_json(answer).encode() + b'\r\n\r\n')
                     answer = utils.dumps_json(answer)
                     client.sendall(answer.encode() + b'\r\n\r\n')
@@ -646,7 +646,7 @@ class Peer:
 
                     if not Node.Equals(data['sender'], self.node):
                         self.update(data['sender'])
-                
+
                 elif data['method'] == 'UPDATE':
                     self._update(data['store_key'], data['store_value'], data['publisher'], data['sender'])
 
@@ -654,14 +654,14 @@ class Peer:
                     result = self.node.FIND_NODE(data['id'])
                     answer = {'operation': 'RESPONSE', 'result': result,
                                 'key': data['key'], 'sender': [self.node.ID, self.node.ip, self.node.port] }
-                    
+
                     # client.sendall(utils.dumps_json(answer).encode() + b'\r\n\r\n')
                     answer = utils.dumps_json(answer)
                     client.sendall(answer.encode() + b'\r\n\r\n')
 
                     if not Node.Equals(data['sender'], self.node):
                         self.update(data['sender'])
-        
+
         while True:
             c, _ = self.tcp_server.accept()
             threading._start_new_thread(attend, (c,))
@@ -682,7 +682,7 @@ class Peer:
     def __del__(self):
         # open('files/destructor called', 'w')
         self._close_socket(self.udp_socket)
-        self._close_socket(self.tcp_server)                
+        self._close_socket(self.tcp_server)
 
     def _update_peers_list(self, key, value, publisher, sender):
         key = str(key)
@@ -694,17 +694,17 @@ class Peer:
             peers_to_check = [tuple(v) for v in peers_to_check]
             peers_to_check = list(set(peers_to_check))
             # if not isinstance(peers_to_check, list): peers_to_check = [peers_to_check]
-            
+
             # if peers_to_check == database[key]['value']: return # no update
-            
+
             # alive_peers = []
             # for peer in peers_to_check:
             #     sock = socket.socket()
-            #     try: 
+            #     try:
             #         sock.connect((peer['ip'], peer['port']))
             #         alive_peers.append(peer)
             #     except: pass
-            
+
             # database[key] = alive_peers
             database[key]['value'] = peers_to_check
             utils.dump_json(database, self.node.storage)
@@ -718,7 +718,7 @@ class Peer:
 
         database = utils.load_json(self.node.storage)
 
-        if key not in database: 
+        if key not in database:
             database[key] = {}
             database[key]['value'] = value
             database[key]['timeo'] = database[key]['timer'] = datetime.datetime.now()
@@ -727,7 +727,7 @@ class Peer:
             database[key]['publisher'] = publisher
         else:
             for p in value:
-                if p not in database[key]['value']: 
+                if p not in database[key]['value']:
                     database[key]['value'][p] = value[p]
                 else:
                     new_keys = database[key]['value'][p] + value[p]
@@ -741,17 +741,17 @@ class Peer:
             database[key]['timer'] = now
 
         utils.dump_json(database, self.node.storage)
-    
+
     def _update(self, key, value, publisher, sender):
         # Updating names
 
         if int(key) == utils.INDEX_KEY:
             self.node.store_lock.acquire()
-            self._update_names_dic(key, value, publisher, sender) 
+            self._update_names_dic(key, value, publisher, sender)
             self.node.store_lock.release()
         else:
             # Updating peers list
-            self._update_peers_list(key, value, publisher, sender)        
+            self._update_peers_list(key, value, publisher, sender)
 
 # if __name__ == '__main__':
 #     import argparse
@@ -766,7 +766,7 @@ class Peer:
 #     IP = args.ip
 
 #     if not IP:
-#         hostname = socket.gethostname()    
+#         hostname = socket.gethostname()
 #         IP = socket.gethostbyname(hostname)
 
 #     node = Node(ID, IP, int(args.port), B=4, k=2, alpha=2)
@@ -776,8 +776,8 @@ class Peer:
 #         try:
 #             threading._start_new_thread(peer.join, ())
 #             threading._start_new_thread(peer.check_network, ())
-#             threading._start_new_thread(peer.attend_new_nodes, ())  
-            
+#             threading._start_new_thread(peer.attend_new_nodes, ())
+
 #             peer.attend_clients
 #         except Exception as ex:
 #             print('UN ERROR PROVOCÓ EL REINICO DEL NODO')
@@ -794,12 +794,12 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--ip', type=str, default=None)
 
     args = parser.parse_args()
-    
+
     ID = args.id
     IP = args.ip
 
     if not IP:
-        hostname = socket.gethostname()    
+        hostname = socket.gethostname()
         IP = socket.gethostbyname(hostname)
 
     node = Node(ID, IP, int(args.udp_port), B=4, k=2, alpha=2)
@@ -807,8 +807,8 @@ if __name__ == '__main__':
 
     threading._start_new_thread(peer.join, ())
     threading._start_new_thread(peer.check_network, ())
-    threading._start_new_thread(peer.attend_clients, ())    
-    threading._start_new_thread(peer.attend_new_nodes, ())    
+    threading._start_new_thread(peer.attend_clients, ())
+    threading._start_new_thread(peer.attend_new_nodes, ())
     # threading._start_new_thread(peer.serve, ())
 
     peer.serve()

@@ -7,6 +7,11 @@ import os
 import time
 import utils
 
+import http.client
+import urllib
+
+TRACKER_IP = "localhost"
+TRACKER_PORT = 5000
 
 class Peer:
     """ Represents a network node that participates in a file exchange """
@@ -69,28 +74,32 @@ class Peer:
         #bitfield round
         print("\n\nPerforming bitfield round")
         peers_bitfields = []
-        for i, p in enumerate(active_peers):
-            addr = (p['ip'], p['port'] + 1)
-            #connect to remote peer
-            print(f"Connecting to {addr}")
-            self.tcp_client = socket.socket()
-            self.tcp_client.connect(addr)
+        for i, p in enumerate(active_peers.copy()):
+            try:
+                addr = (p['ip'], p['port'] + 1)
+                #connect to remote peer
+                print(f"Connecting to {addr}")
+                self.tcp_client = socket.socket()
+                self.tcp_client.connect(addr)
 
-            #get remote peer's bitfield
-            print(f"Requesting {addr} bitfield")
-            bitfield_request(self.tcp_client, infohash)
-            bitfield_answer = self.recv_all(self.tcp_client)
-            print(f"Bifield from {addr} received")
+                #get remote peer's bitfield
+                print(f"Requesting {addr} bitfield")
+                bitfield_request(self.tcp_client, infohash)
+                bitfield_answer = self.recv_all(self.tcp_client)
+                print(f"Bifield from {addr} received")
 
-            #If no answer from remote_peer, close the connection
-            if not bitfield_answer:
-                print("Closing the connection")
-                self.tcp_client.close()
+                #If no answer from remote_peer, close the connection
+                if not bitfield_answer:
+                    print("Closing the connection")
+                    self.tcp_client.close()
+                    active_peers.pop(i)
+                    continue
+
+                bitfield_answer = json.loads(bitfield_answer)
+                peers_bitfields.append(bitfield_answer["bitfield"])
+            except (ConnectionResetError, ConnectionRefusedError, socket.timeout):
                 active_peers.pop(i)
                 continue
-
-            bitfield_answer = json.loads(bitfield_answer)
-            peers_bitfields.append(bitfield_answer["bitfield"])
 
         print("Bitfield round finished\n\n\n")
 
@@ -101,49 +110,63 @@ class Peer:
         file_info["bitfield"] = [False for _ in range(metainfo["info"]["no_pieces"])]
         file_info["piece_length"] = metainfo["info"]["piece_length"]
 
+        connection = http.client.HTTPConnection(TRACKER_IP, TRACKER_PORT)
+        msg_sent = False
+
         for j, b in enumerate(peers_bitfields):
             for i in range(len(b)):
                 if b[i] and not file_info["bitfield"][i]:
-                    #connect to the peer
-                    self.tcp_client = socket.socket()
-                    addr = (active_peers[j]['ip'], active_peers[j]['port'] + 1)
-                    self.tcp_client.connect(addr)
-
-                    #request the piece
-                    print(f"Requesting piece {i}")
-                    piece(self.tcp_client, i, metainfo["info"]["name"], metainfo["info"]["piece_length"])
-
-                    #download the piece
-                    print(f"Copying piece {i}")
-                    # data = self.tcp_client.recv(metainfo["info"]["piece_length"] * 2)
-                    data = self.recv_all(self.tcp_client)
-                    if not data:
-                        continue
-                    print(f"Piece {i} copied successfully")
-
-                    #write the whole piece in the partial file of the download
-                    print(f"Copying piece {i}")
                     try:
-                        with open(f"/media/tony/01D54288CC477C00/Escuela/4to/Sistemas distribuidos/BitTorrent/bittorrent/BitTorrentProtocol/downloaded/{metainfo['info']['short_name']}{metainfo['info']['extension']}", "r+b") as f:
-                            piece_length = metainfo["info"]["piece_length"]
-                            #set the offset of the file in the correct place of the piece
-                            f.seek(piece_length * i, 0)
-                            #write the piece
-                            f.write(data)
-                    except:
-                        with open(f"/media/tony/01D54288CC477C00/Escuela/4to/Sistemas distribuidos/BitTorrent/bittorrent/BitTorrentProtocol/downloaded/{metainfo['info']['short_name']}{metainfo['info']['extension']}", "wb") as f:
-                            piece_length = metainfo["info"]["piece_length"]
-                            f.seek(piece_length * i, 0)
-                            f.write(data)
+                        #connect to the peer
+                        self.tcp_client = socket.socket()
+                        addr = (active_peers[j]['ip'], active_peers[j]['port'] + 1)
+                        self.tcp_client.connect(addr)
 
-                    print(f"Piece {i} downloaded successfully")
+                        #request the piece
+                        print(f"Requesting piece {i}")
+                        piece(self.tcp_client, i, metainfo["info"]["name"], metainfo["info"]["piece_length"])
 
-                    #mark the piece in the bitfield
-                    self.files[infohash]["bitfield"][i] = True
+                        #download the piece
+                        print(f"Copying piece {i}")
+                        # data = self.tcp_client.recv(metainfo["info"]["piece_length"] * 2)
+                        data = self.recv_all(self.tcp_client)
+                        if not data:
+                            continue
+                        print(f"Piece {i} copied successfully")
 
-                    #update the 'files_shared' file
-                    with open(f"files_shared{self.client_port}.json", "w") as json_file:
-                        json.dump(self.files, json_file)
+                        #write the whole piece in the partial file of the download
+                        print(f"Copying piece {i}")
+                        try:
+                            with open(f"downloaded/{metainfo['info']['short_name']}{metainfo['info']['extension']}", "r+b") as f:
+                                piece_length = metainfo["info"]["piece_length"]
+                                #set the offset of the file in the correct place of the piece
+                                f.seek(piece_length * i, 0)
+                                #write the piece
+                                f.write(data)
+                        except:
+                            with open(f"downloaded/{metainfo['info']['short_name']}{metainfo['info']['extension']}", "wb") as f:
+                                piece_length = metainfo["info"]["piece_length"]
+                                f.seek(piece_length * i, 0)
+                                f.write(data)
+
+                        print(f"Piece {i} downloaded successfully")
+
+                        if not msg_sent:
+                            connection.request("PUT", urllib.parse.quote(f"/have/{self.id}/{self.ip}/{self.client_port}/incomplete/{metainfo['info']['short_name']}/{infohash}"))
+                            msg_sent = True
+
+                        #mark the piece in the bitfield
+                        self.files[infohash]["bitfield"][i] = True
+
+                        #update the 'files_shared' file
+                        with open(f"files_shared{self.client_port}.json", "w") as json_file:
+                            json.dump(self.files, json_file)
+
+                        #close the connection with tracker
+                        connection.close()
+
+                    except (ConnectionResetError, ConnectionRefusedError, socket.timeout):
+                        pass
 
         return self.files[infohash]["bitfield"]
 
