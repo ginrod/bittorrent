@@ -281,10 +281,13 @@ class Peer:
                 # If exists it is moved to the tail of the list and the sender node is discarded
                 try:
                     # print(kBucket[0])
-                    self.send_udp_msg(utils.dumps_json(msg).encode(), (leastNodeIp, leastNodePort))
+                    # self.send_udp_msg(utils.dumps_json(msg).encode(), (leastNodeIp, leastNodePort))
+                    # self.get_response(msg['key'])
+                    sock = self.sendall(msg, leastNodeIp, close=False)
+                    sock.settimeout(1)
+                    ans = sock.recv(1024)
+                    if ans.decode() != 'PING': raise socket.timeout()
 
-                    # self.get_answer(msg['key'])
-                    self.get_response(msg['key'])
                     kBucket.append(kBucket[0])
                     kBucket.remove(kBucket[0])
                 # otherwise it's evicted from the k-bucket and the new node inserted at the tail
@@ -331,9 +334,16 @@ class Peer:
                     msg = utils.build_FIND_NODE_msg(ID, self.node.asTuple())
 
                     ip, port = n[1], n[2]
-                    self.send_udp_msg(utils.dumps_json(msg).encode(), (ip, port))
-                    # data = self.get_answer(msg['key'])
-                    data = self.get_response(msg['key'])
+                    # self.send_udp_msg(utils.dumps_json(msg).encode(), (ip, port))
+                    # # data = self.get_answer(msg['key'])
+                    # data = self.get_response(msg['key'])
+
+                    sock = self.sendall(msg, n[1], close=False)
+                    # data = self.get_response(msg['key'])
+                    data = self.recvall(sock)
+                    data = json.loads(data)
+                    utils.close_connection(sock)
+
                     if data:
                         k_closest = [(t[0], tuple(t[1])) for t in data['result']]
                         self.update(tuple(data['sender']))
@@ -500,11 +510,13 @@ class Peer:
         self.node.print_routing_table()
 
     def sendall(self, msg, ip, port=9000, close=True):
-        sock = socket.socket()
-        sock.connect((ip, port))
-        sock.sendall(utils.dumps_json(msg).encode() + b'\r\n\r\n')
-        if close: utils.close_connection(sock)
-        return sock
+        try:
+            sock = socket.socket()
+            sock.connect((ip, port))
+            sock.sendall(utils.dumps_json(msg).encode() + b'\r\n\r\n')
+            if close: utils.close_connection(sock)
+            return sock
+        except (TimeoutError, OSError): pass
 
     def send_udp_msg(self, msg, addr):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -554,7 +566,7 @@ class Peer:
         msg = None
         try:
             msg = recv()
-        except OSError: pass
+        except: pass
         
         return msg
 
@@ -620,6 +632,17 @@ class Peer:
                 elif data['method'] == 'UPDATE':
                     self._update(data['store_key'], data['store_value'], data['publisher'], data['sender'])
 
+                elif data['method'] == 'FIND_NODE':
+                    result = self.node.FIND_NODE(data['id'])
+                    answer = {'operation': 'RESPONSE', 'result': result,
+                                'key': data['key'], 'sender': [self.node.ID, self.node.ip, self.node.port] }
+                    
+                    # client.sendall(utils.dumps_json(answer).encode() + b'\r\n\r\n')
+                    answer = utils.dumps_json(answer)
+                    client.sendall(answer.encode() + b'\r\n\r\n')
+
+                    if not Node.Equals(data['sender'], self.node):
+                        self.update(data['sender'])
         
         while True:
             c, _ = self.tcp_server.accept()
@@ -711,26 +734,56 @@ class Peer:
             # Updating peers list
             self._update_peers_list(key, value, publisher, sender)        
 
+# if __name__ == '__main__':
+#     import argparse
+#     parser = argparse.ArgumentParser()
+#     parser.add_argument('-id', '--id', type=int, default=0)
+#     parser.add_argument('-port', '--port', type=int, default=9000)
+#     parser.add_argument('-ip', '--ip', type=str, default=None)
+
+#     args = parser.parse_args()
+
+#     ID = args.id
+#     IP = args.ip
+
+#     if not IP:
+#         hostname = socket.gethostname()    
+#         IP = socket.gethostbyname(hostname)
+
+#     node = Node(ID, IP, int(args.port), B=4, k=2, alpha=2)
+#     peer = Peer(node, int(args.port))
+
+#     while True:
+#         try:
+#             threading._start_new_thread(peer.join, ())
+#             threading._start_new_thread(peer.check_network, ())
+#             threading._start_new_thread(peer.attend_new_nodes, ())  
+            
+#             peer.attend_clients
+#         except Exception as ex:
+#             print('UN ERROR PROVOCÓ EL REINICO DEL NODO')
+#             print(ex)
+#             if isinstance(ex, KeyboardInterrupt):
+#                 break
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('-p', '--udp_port', type=int, default=8000)
     parser.add_argument('-i', '--id', type=int, default=0)
     parser.add_argument('-s', '--tcp_server_port', type=int, default=9000)
-    parser.add_argument('-d', '--ip', type=str, default='192.168.1.100')
+    parser.add_argument('-d', '--ip', type=str, default=None)
 
     args = parser.parse_args()
-
+    
     ID = args.id
-    hostname = socket.gethostname()    
-    IP = socket.gethostbyname(hostname)
-    
-    # IP = args.ip
-    
+    IP = args.ip
 
-    print('IP =', IP)
-    # IP = args.ip
-    node = Node(ID, IP, int(args.udp_port), B=4, k=3, alpha=2)
+    if not IP:
+        hostname = socket.gethostname()    
+        IP = socket.gethostbyname(hostname)
+
+    node = Node(ID, IP, int(args.udp_port), B=4, k=2, alpha=2)
     peer = Peer(node, int(args.tcp_server_port))
 
     threading._start_new_thread(peer.join, ())

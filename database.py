@@ -228,11 +228,14 @@ if __name__ == "__main__":
         data = f.read()
 
     # database[7] = utils.assign(data, name='real.torrent')
-    loaded = database[7]
-    equals = data == loaded
     # database[6] = utils.assign([('127.0.0.1', 8080, -1)], to_update=True)
     # database[6] = utils.assign([('127.0.0.1', 8081, -2)], to_update=True)
-    
+    # database[5] = utils.assign([('192.0.0.1', 8080, -1)], to_update=True)
+    # database[5] = utils.assign([('192.0.0.1', 8081, -2)], to_update=True)
+
+    loaded = database[7]
+    equals = data == loaded
+
 
     print(equals)
     # import threading
