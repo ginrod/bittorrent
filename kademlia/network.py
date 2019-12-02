@@ -711,6 +711,7 @@ class Peer:
             self.node.store_lock.release()
         else:
             self.node.store_lock.release()
+            if not isinstance(value, list): value = [value]
             self.node.STORE(key, value, publisher, sender, to_update=True)
 
     def _update_names_dic(self, key, value, publisher, sender):
