@@ -224,8 +224,8 @@ if __name__ == "__main__":
     # print(f'3:{database[3]}')
     # print(f'4:{database[4]}')
     data = []
-    with open('files/torrents/real.torrent', 'rb') as f:
-        data = f.read()
+    # with open('files/torrents/real.torrent', 'rb') as f:
+    #     data = f.read()
 
     # database[7] = utils.assign(data, name='real.torrent')
     # database[6] = utils.assign([('127.0.0.1', 8080, -1)], to_update=True)
