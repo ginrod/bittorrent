@@ -113,6 +113,8 @@ main.py
 lookup_debug
 DummyClient.py
 input.txt
+testing.py
+test.py
 
 # Directories
 .vscode/

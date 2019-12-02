@@ -7,6 +7,7 @@ import flask
 import sys
 
 from utils import get_infohash
+from database import Database
 
 import json
 
@@ -16,10 +17,10 @@ def _print(text, flag='a'):
 
 class Tracker:
 
-    def __init__(self, ip, port, database, request_interval=5, min_interval=5):
+    def __init__(self, ip, port, request_interval=5, min_interval=5):
         self.ip = ip
         self.port = port
-        self.database = database
+        self.database = Database(ip, 5050)
         # self._request_interval = request_interval
         # self._min_interval = min_interval
         # self._tracker_id = hashlib.sha1((str(os.getpid()) + str(time.time())).encode()).hexdigest()
@@ -69,9 +70,9 @@ class Tracker:
 
 app = flask.Flask(__name__)
 
-DATABASE = {}
+# DATABASE = {}
 
-TRACKER = Tracker("0.0.0.0", 8000, DATABASE)
+TRACKER = Tracker("0.0.0.0", 8000)
 
 @app.route('/announce')
 def announce():
