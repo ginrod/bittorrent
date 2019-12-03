@@ -62,12 +62,17 @@ class Node:
         return self.ID ^ int(other[0])
 
     def FIND_VALUE(self, ID):
+        self.store_lock.acquire()
         data = utils.load_json(self.storage)
         if str(ID) in data:
             file_bytes = None
             if data[str(ID)]['value_type'] == 'file': 
                 file_bytes = utils.load_file(data[str(ID)]['value']) 
+            
+            self.store_lock.release()
             return (True, data[str(ID)], file_bytes)
+        
+        self.store_lock.release()
         return (False, self.FIND_NODE(ID), None)
     
     def STORE(self, key, value, publisher, sender, value_type='json', real_value=None, to_update=False):

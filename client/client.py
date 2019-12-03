@@ -27,12 +27,74 @@ class Client:
     # NO_PEER_ID = 0
     # COMPACT = 0
 
-    def __init__(self, ip, port):
+    '''
+    FINDING TRACKER VIA BROADCAST
+    '''
+    def get_connection(self):
+        while not self.contact:
+            try : 
+                self.find_contact()
+            except: 
+                pass
+            time.sleep(0.5)
+    
+    def find_contact(self, localhost_only=False):
+        broadcast_msg = { 'operation': 'DISCOVER', 'join': False, 'ip': self.ip, 'port': self.port, 
+                          'sender': [-1, self.ip, self.port]  }
+        broadcast_msg = json.dumps(broadcast_msg).encode()
+        
+        def do_broadcast():
+            udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            if localhost_only:
+                for p in range(8000, 8081):
+                # for p in range(8002, 8003):
+                    udp_sock.sendto(broadcast_msg, ('127.0.0.1', p))
+            else:
+                udp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                udp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                udp_sock.sendto(broadcast_msg, ('255.255.255.255', 6666))
+
+        # threading._start_new_thread(do_broadcast, )
+        do_broadcast()
+
+        # Set socket as server
+        server = socket.socket()
+        server.settimeout(0.5)
+        # try:    
+        server.bind(('', self.port))
+        # except Exception as ex:
+        #     pass
+
+        server.listen(1)
+        dht_peer, _ = server.accept()
+        # self.contact = tuple(json.loads(self._recvall(dht_peer)))        
+        self.contact = tuple(json.loads(dht_peer.recv(1024)))        
+        
+        # Set socket as client
+        # self.close_connection()
+        server.close()
+
+    def check_tracker(self):
+        import socket
+        sock = socket.socket()
+        try:
+            sock.connect((self.contact))
+        except:
+            self.get_connection()
+            TRACKER_IP, TRACKER_PORT = self.contact
+            TRACKER_URL = f"{TRACKER_IP}:{TRACKER_PORT}"
+
+    def get_tracker_url(self):
+        self.check_tracker()
+        return f"{self.contact[0]}:{self.contact[1]}"
+
+    def __init__(self, ip, port, contact=None):
         self.ip = ip
         self.port = port
         self.id = hashlib.sha1((str(os.getpid()) + str(time.time())).encode()).hexdigest()
         self.tracker_id = None
         self.peer = Peer(self.ip, self.port, self.port + 1)
+        self.contact = contact
 
         threading._start_new_thread(self.peer.accept_connections,())
 
@@ -103,6 +165,7 @@ class Client:
         complete = False
 
         while not complete:
+            TRACKER_URL = self.get_tracker_url()
             request = self.create_announce_request(_metainfo, TRACKER_URL, uploaded, downloaded, "started")
             response = self.make_announce_request(connection, request)
             bitfield = self.peer.download(response['peers'], _metainfo)
@@ -114,6 +177,7 @@ class Client:
 
     def share(self, path, mode="single-file", root_name=""):
         #create the .torrent
+        TRACKER_URL = self.get_tracker_url()
         _metainfo = metainfo.create_metainfo([path], TRACKER_URL)
         _metainfo_encoded = torrent_parser.encode(_metainfo)
 
@@ -146,7 +210,7 @@ if __name__ == "__main__":
 
     import argparse, socket
     parser = argparse.ArgumentParser()
-    parser.add_argument('-port', '--port', type=int, default=7000)
+    parser.add_argument('-port', '--port', type=int, default=7006)
     parser.add_argument('-ip', '--ip', type=str, default='192.168.1.100')
 
     args = parser.parse_args()

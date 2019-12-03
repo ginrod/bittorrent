@@ -15,15 +15,15 @@ INDEX_KEY = 10
 
 def resetable(F):
     def wrapper(inst):
-        # while True:
-            # try:
-        F(inst)
-            # except (Exception, KeyboardInterrupt) as ex:
-            #     if isinstance(ex, KeyboardInterrupt):
-            #         print('NODO INTERRUMPIDO')
-            #         break
-            #     print('EL NODO SE HA REINICIADO DEBIDO A UNA EXCEPCIÓN')
-            #     print(ex)
+        while True:
+            try:
+                F(inst)
+            except (Exception, KeyboardInterrupt) as ex:
+                if isinstance(ex, KeyboardInterrupt):
+                    print('NODO INTERRUMPIDO')
+                    break
+                print('EL NODO SE HA REINICIADO DEBIDO A UNA EXCEPCIÓN')
+                print(ex)
 
     return wrapper
 
@@ -709,7 +709,7 @@ class Peer:
             for dic in value:
                 if dic['id'] not in ids:
                     database[key]['value'].append(dic)
-                    
+
             utils.dump_json(database, self.node.storage)
             self.node.store_lock.release()
         else:

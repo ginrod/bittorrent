@@ -8,7 +8,7 @@ import sys
 
 from database import Database
 
-import json, utils_tracker
+import json, utils_tracker, socket, threading
 
 def _print(text, flag='a'):
     with open("tracker_trace", flag) as f:
@@ -18,12 +18,51 @@ def get_infohash(metainfo):
     return hashlib.sha1(torrent_parser.encode(metainfo["info"])).hexdigest()
 
 class Tracker:
+    # 6666
+    def attend_clients(self):
+        sock = socket.socket()
+        sock.bind(('', 6660))
+        sock.listen(256)
+
+        def attend(client):
+            while True:
+                msg = client.recv(1024)
+                if not msg:
+                    break
+                # threading._start_new_thread(self.proccess_message, ())
+
+        while True:
+            c, _ = sock.accept()
+            threading._start_new_thread(attend, (c,))
+
+    def proccess_message(self, data, addr):
+        if data['operation'] == 'DISCOVER':
+            ip, port = str(data['ip']), int(data['port'])
+            sock = socket.socket()
+            sock.connect((ip, port))
+            server_ip = self.database.ip
+            my_addr = server_ip, 6660
+            sock.send(json.dumps(my_addr).encode())
+            sock.close()
+
+    def attend_new_nodes(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.bind(('', 6666))
+        while True:
+            msg, _ = sock.recvfrom(1024)
+
+            if msg is not None:
+                data = json.loads(msg)
+                addr = data['sender'][1], data['sender'][2]
+                threading._start_new_thread(self.proccess_message, (data, addr))
 
     def __init__(self, ip, port=5050, request_interval=5, min_interval=5):
         self.database = Database(ip, port)
         # self._request_interval = request_interval
         # self._min_interval = min_interval
         # self._tracker_id = hashlib.sha1((str(os.getpid()) + str(time.time())).encode()).hexdigest()
+        threading._start_new_thread(self.attend_clients, ())
+        threading._start_new_thread(self.attend_new_nodes, ())
 
     def build_response(self, request):
 
