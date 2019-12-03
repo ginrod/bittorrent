@@ -8,7 +8,7 @@ import sys
 
 from database import Database
 
-import json
+import json, utils_tracker
 
 def _print(text, flag='a'):
     with open("tracker_trace", flag) as f:
@@ -29,9 +29,10 @@ class Tracker:
 
         answer = {}
 
-        stats = self.database[request['name']][request['infohash']]
-
-        answer["peers"] = stats["peers_complete"] + stats["peers_incomplete"]
+        # name + infohash + "peers_complete"
+        ID = request['name'] + request['infohash'] + 'peers'
+        hashed = utils_tracker.get_key(ID)
+        answer["peers"] = self.database[request['name'] + request['infohash'] + 'peers']
 
         # answer["complete"] = stats["complete"]
         # answer["incomplete"] = stats["incomplete"]
@@ -82,15 +83,27 @@ def announce():
 
 @app.route('/have/<client_id>/<ip>/<port>/<portion>/<name>/<infohash>', methods=["PUT"])
 def have(client_id, ip, port, portion, name, infohash):
-    if portion == "complete":
-        TRACKER.database[name][infohash]["peers_complete"].append({"ip": ip, "port": int(port), "id": client_id})
-    else:
-        TRACKER.database[name][infohash]["peers_incomplete"].append({"ip": ip, "port": int(port), "id": client_id})
+    # if portion == "complete":
+        # TRACKER.database[name][infohash]["peers_complete"].append({"ip": ip, "port": int(port), "id": client_id})
+    TRACKER.database[name + infohash + "peers"] = utils_tracker.assign(data={"ip": ip, "port": int(port), "id": client_id}, to_update=True)
+    # else:
+    #     # TRACKER.database[name][infohash]["peers_incomplete"].append({"ip": ip, "port": int(port), "id": client_id})
+    #     TRACKER.database[name + infohash + "peers"] = utils_tracker.assign(data={"ip": ip, "port": int(port), "id": client_id}, to_update=True)
     return ""
 
 @app.route('/search')
 def search():
-    metainfos = TRACKER.database[flask.request.args["name"]]
+    # metainfos = TRACKER.database[flask.request.args["name"]]
+    pattern_torrents_keys_dic = TRACKER.database[utils_tracker.INDEX_KEY]
+    name = flask.request.args["name"]
+    torrent_keys = pattern_torrents_keys_dic[name]
+    # torrents_keys [flask.request.args['name']]
+    # {'Maluma': [12831271, 32082198372]
+    # metainfo = TRACKER.Databse[32082198372]
+    metainfos = []
+    for key in torrent_keys:
+        metainfo = TRACKER.database[key]
+        metainfos.append(metainfo)
     
     return json.dumps(metainfos)
 
@@ -102,25 +115,28 @@ def metainfo(client_id, ip, port):
         name = metainfo_decoded["info"]["short_name"]
         infohash = get_infohash(metainfo_decoded)
 
-        try:
-            TRACKER.database[name][infohash] = {"metainfo": metainfo_decoded}
-        except:
-            TRACKER.database[name] = {infohash: {"metainfo": metainfo_decoded}}
+        print(f'NAME: {name}')
+        ID = name + infohash + "peers"
+        hashed = utils_tracker.get_key(ID)
+        # print('SETTING metainfo')
+        TRACKER.database[name + infohash + "metainfo"] = utils_tracker.assign(metainfo_decoded, name)
+        
 
-        TRACKER.database[name][infohash]["peers_complete"] = [{"ip": ip, "port": int(port), "id": client_id}]
-        TRACKER.database[name][infohash]["peers_incomplete"] = []
+        # print('SETTING peers list')
+        TRACKER.database[name + infohash + "peers"] = utils_tracker.assign({"ip": ip, "port": int(port), "id": client_id}, to_update=True)
+        # TRACKER.database[name + infohash + "peers_incomplete"] = []
 
-        print_database()
+        # print_database()
         return ""
 
-def print_database():
-    print(".torrents:")
+# def print_database():
+#     print(".torrents:")
 
-    for name in TRACKER.database:
-        for infohash in TRACKER.database[name]:
-            _metainfo = TRACKER.database[name][infohash]["metainfo"]
-            print(f"name: {_metainfo['info']['short_name']}\textension: {_metainfo['info']['extension']}\tsize: {_metainfo['info']['length']}\tpiece length: {_metainfo['info']['piece_length']}\tpieces: {_metainfo['info']['no_pieces']}")
-    print("---" * 40 + "\n")
+#     for name in TRACKER.database:
+#         for infohash in TRACKER.database[name]:
+#             _metainfo = TRACKER.database[name][infohash]["metainfo"]
+#             print(f"name: {_metainfo['info']['short_name']}\textension: {_metainfo['info']['extension']}\tsize: {_metainfo['info']['length']}\tpiece length: {_metainfo['info']['piece_length']}\tpieces: {_metainfo['info']['no_pieces']}")
+#     print("---" * 40 + "\n")
 
 # @app.route('/scrape')
 # def scrape():

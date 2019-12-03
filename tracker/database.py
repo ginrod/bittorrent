@@ -70,13 +70,13 @@ class Database:
             sock.sendall(json.dumps(msg).encode() + b'\r\n\r\n')
             value = self._recvall(sock)
             founded = True
-            try: founded, value = json.loads(value)
+            try: founded, value = value
             except: pass
 
             if not founded: value = None
             # if not founded: raise Exception('El valor no está en la base de datos')
 
-            return value
+            return json.loads(value)
 
         if isinstance(ID, str): ID = utils_tracker.get_key(ID)
         sock = socket.socket() 
@@ -84,7 +84,7 @@ class Database:
             sock.connect((self.contact))
             value = get(sock)
             utils_tracker.close_connection(sock)
-            return value
+            return value['value']
         except Exception as ex:
             print(ex)
             self.get_connection()
@@ -92,7 +92,7 @@ class Database:
         
         value = get(sock)
         utils_tracker.close_connection(sock)
-        return value
+        return value['value']
 
     def _send_bytes(self, bytes_array):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -146,17 +146,22 @@ class Database:
                 is_file = True
                 
             sock.sendall(msg + b'\r\n\r\n')
+            # print(f'SENDING MSG:\n{msg}')
             if not is_json_serializable:
                 self._send_bytes(value)
             
-            if is_file:
+            if name or is_file:
                 patterns = list(utils_tracker.get_substrings(name[0])) + name[1:]
                 patterns = list(set(patterns))
                 store_value = { p:[ID] for p in patterns }
                 # msg = utils_tracker.build_PUBLISH_msg(utils_tracker.INDEX_KEY, (ID, patterns), to_update=True)
                 msg = utils_tracker.build_PUBLISH_msg(utils_tracker.INDEX_KEY, store_value, to_update=True)
                 msg = json.dumps(msg).encode()
-                sock.sendall(msg + b'\r\n\r\n')
+                sock2 = socket.socket()
+                sock2.connect((self.contact)) 
+                sock2.sendall(msg + b'\r\n\r\n')
+                sock2.close()
+                # print(f'SENDING MSG:\n{msg}')
             
             sock.close()
 
@@ -227,7 +232,7 @@ if __name__ == "__main__":
     # with open('files/torrents/real.torrent', 'rb') as f:
     #     data = f.read()
 
-    # database[7] = utils_tracker.assign(data, name='real.torrent')
+    database[7] = utils_tracker.assign(data, name='real.torrent')
     # database[6] = utils_tracker.assign([('127.0.0.1', 8080, -1)], to_update=True)
     # database[6] = utils_tracker.assign([('127.0.0.1', 8081, -2)], to_update=True)
     # database[5] = utils_tracker.assign([('192.0.0.1', 8080, -1)], to_update=True)

@@ -70,9 +70,14 @@ class Client:
         url = urllib.parse.urlencode({"name": name})
         connection.request("GET", f"/search?{url}")
         response = json.loads(connection.getresponse().read())
+        response = response[0] if response != "NO" else response 
+
         if response == "NO":
             raise Exception("There is not .torrent for that name")
-        return [(key, response[key]["metainfo"]) for key in response]
+
+        infohash = get_infohash(response)
+        # return [(key, response[key]["metainfo"]) for key in response]
+        return infohash, response
 
     def make_announce_request(self, connection, url):
         connection.request("GET", url)
@@ -88,10 +93,9 @@ class Client:
 
         connection = http.client.HTTPConnection(TRACKER_IP, TRACKER_PORT)
         print("Connected to TRACKER")
-
-        #For the moment assume that the client wants the first element of the list
+        
         try:
-            infohash, _metainfo = self.request_metainfo(connection, name)[0]
+            infohash, _metainfo = self.request_metainfo(connection, name)
         except Exception:
             print(f"The tracker doesn't know about any torrent of name: {name}")
             return
@@ -143,7 +147,7 @@ if __name__ == "__main__":
     import argparse, socket
     parser = argparse.ArgumentParser()
     parser.add_argument('-port', '--port', type=int, default=7000)
-    parser.add_argument('-ip', '--ip', type=str, default=None)
+    parser.add_argument('-ip', '--ip', type=str, default='192.168.1.100')
 
     args = parser.parse_args()
 

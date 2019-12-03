@@ -72,6 +72,7 @@ class Node:
     
     def STORE(self, key, value, publisher, sender, value_type='json', real_value=None, to_update=False):
         self.store_lock.acquire()
+        # print(f'STORING key:{key}, value:{value}')
         key = str(key)
 
         database = utils.load_json(self.storage)

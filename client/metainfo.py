@@ -55,10 +55,18 @@ def create_metainfo(paths, announce, announce_list=[], mode="single-file", encod
         with open(paths[0]) as file:
             metainfo["info"]["name"] = paths[0]
 
-            try:
-                metainfo["info"]["short_name"] = file.name[file.name.rfind('/') + 1: file.name.rfind('.')]
-            except:
-                metainfo["info"]["short_name"] = file.name[file.name.rfind('/') + 1:]
+            import platform
+            osystem = platform.system()
+
+            if osystem == 'Linux':
+                try:
+                    metainfo["info"]["short_name"] = file.name[file.name.rfind('/') + 1: file.name.rfind('.')]
+                except:
+                    metainfo["info"]["short_name"] = file.name[file.name.rfind('/') + 1:]
+            else:
+                last_route = max(file.name.rfind('/'), file.name.rfind('\\')) + 1
+                end_name = len(file.name) if file.name.rfind('.') == -1 else file.name.rfind('.') 
+                metainfo["info"]["short_name"] = file.name[last_route:end_name]
 
             try:
                 metainfo["info"]["extension"] = file.name[file.name.rfind('.'):]
