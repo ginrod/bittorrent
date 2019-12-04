@@ -7,7 +7,7 @@ import torrent_parser
 import hashlib, sys
 
 # Kademlia ID used to do a name index in database
-INDEX_KEY = 10
+INDEX_KEY = 661843241451724053717825306583068845753374048118
 
 def get_key(s: str):
     h = hashlib.sha1(s.encode())

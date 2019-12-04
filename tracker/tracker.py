@@ -26,7 +26,9 @@ class Tracker:
 
         def attend(client):
             while True:
-                msg = client.recv(1024)
+                try:
+                    msg = client.recv(1024)
+                except: continue
                 if not msg:
                     break
                 # threading._start_new_thread(self.proccess_message, ())
@@ -39,10 +41,12 @@ class Tracker:
         if data['operation'] == 'DISCOVER':
             ip, port = str(data['ip']), int(data['port'])
             sock = socket.socket()
-            sock.connect((ip, port))
-            server_ip = self.database.ip
-            my_addr = server_ip, 6660
-            sock.send(json.dumps(my_addr).encode())
+            try:
+                sock.connect((ip, port))
+                server_ip = self.database.ip
+                my_addr = server_ip, 6660
+                sock.send(json.dumps(my_addr).encode())
+            except: pass
             sock.close()
 
     def attend_new_nodes(self):

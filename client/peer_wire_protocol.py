@@ -245,5 +245,5 @@ class Peer:
         with open("peer_history", "a") as h:
             h.write(f"Peer({self.ip}, {self.client_port}, {self.server_port}): {data}\n")
 
-if __name__ == "__main__":
-    A = Peer("127.0.0.1", 8000, 8001)
+# if __name__ == "__main__":
+    # A = Peer("127.0.0.1", 8000, 8001)

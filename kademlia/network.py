@@ -794,18 +794,21 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('-uport', '--udp_port', type=int, default=8000)
-    parser.add_argument('-id', '--id', type=int, default=0)
+    parser.add_argument('-id', '--id', type=int, default=-1)
     parser.add_argument('-tport', '--tcp_server_port', type=int, default=9000)
     parser.add_argument('-ip', '--ip', type=str, default=None)
 
     args = parser.parse_args()
 
-    ID = args.id
     IP = args.ip
-
     if not IP:
         hostname = socket.gethostname()
         IP = socket.gethostbyname(hostname)
+
+    import uuid
+    ID = int(args.id)
+    if ID == -1:
+        ID = utils.get_key(uuid.uuid4().hex)
 
     node = Node(ID, IP, int(args.udp_port), B=160, k=20, alpha=3)
     peer = Peer(node, int(args.tcp_server_port))

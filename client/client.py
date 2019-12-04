@@ -153,6 +153,8 @@ class Client:
         downloaded = 0
         uploaded = 0
 
+        # _ = self.get_tracker_url()
+        # TRACKER_IP, TRACKER_PORT = self.contact
         connection = http.client.HTTPConnection(TRACKER_IP, TRACKER_PORT)
         print("Connected to TRACKER")
         
@@ -210,7 +212,7 @@ if __name__ == "__main__":
 
     import argparse, socket
     parser = argparse.ArgumentParser()
-    parser.add_argument('-port', '--port', type=int, default=7006)
+    parser.add_argument('-port', '--port', type=int, default=7008)
     parser.add_argument('-ip', '--ip', type=str, default='192.168.1.100')
 
     args = parser.parse_args()
