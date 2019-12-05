@@ -35,8 +35,8 @@ def bitfield_request(s, infohash):
 def request(s, index):
     send_msg({"message": "request", "index": index}, s)
 
-def piece(s, index, file_name, length):
-    send_msg({"message": "piece", "index": index, "file_name": file_name, "length": length}, s)
+def piece(s, index, infohash, length):
+    send_msg({"message": "piece", "index": index, "infohash": infohash, "length": length}, s)
 
 def cancel(s, index, begin, length):
     send_msg({"message": "cancel", "begin": begin, "index": index, "length": length}, s)

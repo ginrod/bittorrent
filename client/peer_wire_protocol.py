@@ -136,7 +136,12 @@ class Peer:
         file_info["path"] = f"downloaded/{metainfo['info']['name']}"
         file_info["length"] = metainfo["info"]["length"]
 
-        TRACKER_IP, TRACKER_PORT = self.check_tracker()
+        #real app
+        #TRACKER_IP, TRACKER_PORT = self.check_tracker()
+
+        #dev
+        TRACKER_IP = "localhost"
+        TRACKER_PORT = 5000
         connection = http.client.HTTPConnection(TRACKER_IP, TRACKER_PORT)
         msg_sent = False
 
@@ -151,7 +156,7 @@ class Peer:
 
                         #request the piece
                         print(f"Requesting piece {i}")
-                        piece(self.tcp_client, i, metainfo["info"]["name"], metainfo["info"]["piece_length"])
+                        piece(self.tcp_client, i, infohash, metainfo["info"]["piece_length"])
 
                         #download the piece
                         print(f"Copying piece {i}")
@@ -162,7 +167,7 @@ class Peer:
                         print(f"Piece {i} copied successfully")
 
                         #write the whole piece in the partial file of the download
-                        print(f"Copying piece {i}")
+                        # print(f"Copying piece {i}")
                         try:
                             with open(f"downloaded/{metainfo['info']['name']}", "r+b") as f:
                                 piece_length = metainfo["info"]["piece_length"]
@@ -179,7 +184,7 @@ class Peer:
                         print(f"Piece {i} downloaded successfully")
 
                         if not msg_sent:
-                            connection.request("PUT", urllib.parse.quote(f"/have/{self.id}/{self.ip}/{self.client_port}/incomplete/{metainfo['info']['short_name']}/{infohash}"))
+                            connection.request("PUT", urllib.parse.quote(f"/have/{self.id}/{self.ip}/{self.client_port}/incomplete/{metainfo['info']['name']}/{infohash}"))
                             msg_sent = True
 
                         #mark the piece in the bitfield
@@ -253,7 +258,7 @@ class Peer:
             bitfield_answer(connection, self.files[msg['infohash']]["bitfield"])
 
         elif msg["message"] == "piece":
-            with open(f"{msg['file_name']}", "rb") as f:
+            with open(self.files[msg["infohash"]]["path"], "rb") as f:
                 f.seek(msg['index'] * msg['length'])
                 chunk = f.read(msg['length'])
                 data(connection, chunk)
