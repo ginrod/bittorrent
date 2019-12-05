@@ -25,92 +25,13 @@
       <table align="center" border="1">
           <tr>
               <th>Name</th>
-              <th>Extension</th>
               <th>Size</th>
-              <th>Seeders</th>
-              <th>Leachers</th>
               <th></th>
           </tr>
-          <tr>
-              <td>Batma Begins.torrent</td>
-              <td>.mkv</td>
-              <td>4.0 GB</td>
-              <td>23</td>
-              <td>2</td>
-              <td>
-                <input type = "radio"
-                      name = "RadFile"
-                      id = "sizeSmall"
-                      value = "small"
-                      checked = "checked" />
-              </td>
-          </tr>
-          <tr>
-              <td>Batma Begins.torrent</td>
-              <td>.mkv</td>
-              <td>4.0 GB</td>
-              <td>23</td>
-              <td>2</td>
-              <td>
-                <input type = "radio"
-                      name = "RadFile"
-                      id = "sizeSmall"
-                      value = "small"
-                      checked = "checked" />
-              </td>
-          </tr><tr>
-              <td>Batma Begins.torrent</td>
-              <td>.mkv</td>
-              <td>4.0 GB</td>
-              <td>23</td>
-              <td>2</td>
-              <td>
-                <input type = "radio"
-                      name = "RadFile"
-                      id = "sizeSmall"
-                      value = "small"
-                      checked = "checked" />
-              </td>
-          </tr><tr>
-              <td>Batma Begins.torrent</td>
-              <td>.mkv</td>
-              <td>4.0 GB</td>
-              <td>23</td>
-              <td>2</td>
-              <td>
-                <input type = "radio"
-                      name = "RadFile"
-                      id = "sizeSmall"
-                      value = "small"
-                      checked = "checked" />
-              </td>
-          </tr><tr>
-              <td>Batma Begins.torrent</td>
-              <td>.mkv</td>
-              <td>4.0 GB</td>
-              <td>23</td>
-              <td>2</td>
-              <td>
-                <input type = "radio"
-                      name = "RadFile"
-                      id = "sizeSmall"
-                      value = "small"
-                      checked = "checked" />
-              </td>
-          </tr><tr>
-              <td>Batma Begins.torrent</td>
-              <td>.mkv</td>
-              <td>4.0 GB</td>
-              <td>23</td>
-              <td>2</td>
-              <td>
-                <input type = "radio"
-                      name = "RadFile"
-                      id = "sizeSmall"
-                      value = "small"
-                      checked = "checked" />
-              </td>
-          </tr>
+          <tr v-for="el in search_result" :key="el.id">
+            <td>{{el.name}}</td>
+            <td>{{el.size}}</td>
+          </tr>  
           
       </table>
     </div>
@@ -129,19 +50,30 @@ export default {
     msg: String,
     pattern: String
   },
+  data() {
+    return {
+      search_result: []
+    };
+  },
   methods:{
     
   },
   created() {
-      
-    },
-    mounted() {
-      this.pattern = this.$route.query.pattern;
+      this.pattern = this.$route.params.pattern;
       this.msg = this.pattern;
       if (this.pattern === undefined) {
         this.pattern = ""
         this.msg = "[All]"
       }
+      alert(this.pattern)
+      fetch("http://192.168.1.104:5001/search/" + this.pattern).then(function (response) {
+        return response.json();})
+        .then(function (result) {
+          this.search_result =  result;
+    });
+    },
+    mounted() {
+      
     },
 }
 </script>

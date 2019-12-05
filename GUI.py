@@ -1,7 +1,7 @@
 import flask
 from flask import jsonify
-import client
-from client.client import Client
+# import client
+# from client.client import Client
 import torrent_parser
 import json
 import tracker
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     IP = args.ip
-    CLIENT = Client(IP, get_open_port())
+    # CLIENT = Client(IP, get_open_port())
 
 
     if not ip:

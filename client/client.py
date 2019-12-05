@@ -13,10 +13,11 @@ import threading, utils_client
 
 PIECE_LENGTH = 1024
 
+#develop
+TRACKER_IP = "localhost"
+TRACKER_PORT = 5000
 
-# TRACKER_IP = None
-# TRACKER_PORT = None
-# TRACKER_URL = f"{TRACKER_IP}:{TRACKER_PORT}"
+TRACKER_URL = f"{TRACKER_IP}:{TRACKER_PORT}"
 
 def get_infohash(metainfo):
     return hashlib.sha1(torrent_parser.encode(metainfo["info"])).hexdigest()
@@ -60,7 +61,7 @@ class Client:
     def create_announce_request(self, metainfo, tracker_url: str, uploaded, downloaded, event, numwant=None, no_peer_id=None):
 
         params = {
-            "name": metainfo["info"]["short_name"],
+            "name": metainfo["info"]["name"],
             "infohash": get_infohash(metainfo),
 
             "peer_id": self.id,
@@ -108,9 +109,11 @@ class Client:
         downloaded = 0
         uploaded = 0
 
+        #real app
         # _ = self.get_tracker_url()
         # TRACKER_IP, TRACKER_PORT = self.contact
         TRACKER_IP, TRACKER_PORT = self.check_tracker()
+
         connection = http.client.HTTPConnection(TRACKER_IP, TRACKER_PORT)
         print("Connected to TRACKER")
 
@@ -123,6 +126,7 @@ class Client:
         complete = False
 
         while not complete:
+            #real app
             self.check_tracker()
             TRACKER_URL = self.get_tracker_url()
             request = self.create_announce_request(_metainfo, TRACKER_URL, uploaded, downloaded, "started")
@@ -130,14 +134,17 @@ class Client:
             bitfield = self.peer.download(response['peers'], _metainfo)
             complete = all(bitfield)
 
-        connection.request("PUT", urllib.parse.quote(f"/have/{self.id}/{self.ip}/{self.port}/complete/{_metainfo['info']['short_name']}/{infohash}"))
-        self._print(f"downloaded successfully: {_metainfo['info']['short_name']}{_metainfo['info']['extension']}")
+        # connection.request("PUT", urllib.parse.quote(f"/have/{self.id}/{self.ip}/{self.port}/complete/{_metainfo['info']['name']}/{infohash}"))
+        self._print(f"downloaded successfully: {_metainfo['info']['name']}")
         connection.close()
 
-    def share(self, path, mode="single-file", root_name=""):
+    def share(self, path):
         #create the .torrent
+
+        #real app
         self.check_tracker()
         TRACKER_URL = self.get_tracker_url()
+
         _metainfo = metainfo.create_metainfo(path, TRACKER_URL)
         _metainfo_encoded = torrent_parser.encode(_metainfo)
 
@@ -146,18 +153,26 @@ class Client:
         #update the files_shared.json
         self.peer.files[infohash] = {"bitfield": [True for _ in range(_metainfo["info"]["length"]//_metainfo["info"]["piece_length"] + 1)],
                                      "piece_length": _metainfo["info"]["piece_length"],
+                                     "path": path
                                     }
+
         with open(f"files_shared.json", 'w') as f:
             json.dump(self.peer.files, f)
 
         #connect to the tracker
+        #real app
         TRACKER_IP, TRACKER_PORT = self.check_tracker()
+
+
         connection = http.client.HTTPConnection(TRACKER_IP, TRACKER_PORT)
 
         #upload the .torrent
         headers = {"Content-type": "text/plain"}
         connection.request("POST", f"/metainfo/{self.id}/{self.ip}/{self.port}", _metainfo_encoded, headers)
         connection.getresponse()
+
+        connection.request("PUT", urllib.parse.quote(f"/have/{self.id}/{self.ip}/{self.port}/complete/{_metainfo['info']['name']}/{infohash}"))
+
         self._print(f"shared {_metainfo['info']['name']}")
 
         return _metainfo["info"]["name"], _metainfo["info"]["length"]
@@ -174,7 +189,7 @@ if __name__ == "__main__":
     import argparse, socket
     parser = argparse.ArgumentParser()
     parser.add_argument('-port', '--port', type=int, default=7008)
-    parser.add_argument('-ip', '--ip', type=str, default='192.168.1.100')
+    parser.add_argument('-ip', '--ip', type=str, default='192.168.1.101')
 
     args = parser.parse_args()
 
@@ -184,25 +199,6 @@ if __name__ == "__main__":
     if not ip:
         hostname = socket.gethostname()
         ip = socket.gethostbyname(hostname)
-
-    paths = ["/home/tony/Desktop/Orientación del proyecto/COOL Language Reference Manual.pdf",
-            "/media/tony/01D54288CC477C00/Escuela/Música Estudiar, Música Relajante para Reducir Estres, Música para Trabajar, Estudiar, ☯3043.mp4",
-            "/media/tony/01D54288CC477C00/Escuela/4to/Sistemas distribuidos/Distributed_Systems_3-190909.pdf",
-            "/media/tony/01D54288CC477C00/Music/23. Justin Timberlake - Cant Stop The Feeling.mp3",
-            "/home/tony/Desktop/23. Justin Timberlake - Cant Stop The Feeling.mp3",
-            "/home/tony/Desktop/Distributed_Systems_3-190909.pdf",
-	        "/media/tony/Tony1/Peliculas/The Lion King/The Lion King [El Rey Leon] [2019] [1080p] [Dual Audio].mkv",
-            "/media/tony/Tony1/Peliculas/Drama/El Club de Los Incomprendidos [2014] [1,29 Gb]/El Club de Los Incomprendidos [2014].avi"]
-
-    names = [
-            "COOL Language Reference Manual",
-            "Música Estudiar, Música Relajante para Reducir Estres, Música para Trabajar, Estudiar, ☯3043",
-            "Distributed_Systems_3-190909",
-            "23. Justin Timberlake - Cant Stop The Feeling",
-            "23. Justin Timberlake - Cant Stop The Feeling",
-            "Distributed_Systems_3-190909",
-	        "The Lion King [El Rey Leon] [2019] [1080p] [Dual Audio]", "El Club de Los Incomprendidos [2014]"
-            ]
 
     # ip = "localhost"
     # port = int(input("port:"))

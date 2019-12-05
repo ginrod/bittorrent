@@ -10,6 +10,8 @@ from database import Database
 
 import json, utils_tracker, socket, threading
 
+from utils_tracker import get_key
+
 def _print(text, flag='a'):
     with open("tracker_trace", flag) as f:
         f.write(f"{text}\n")
@@ -61,10 +63,12 @@ class Tracker:
                 threading._start_new_thread(self.proccess_message, (data, addr))
 
     def __init__(self, ip, port=5050, request_interval=5, min_interval=5):
+        #real app
         self.database = Database(ip, port)
-        # self._request_interval = request_interval
-        # self._min_interval = min_interval
-        # self._tracker_id = hashlib.sha1((str(os.getpid()) + str(time.time())).encode()).hexdigest()
+
+        #develop
+        # self.database = {}
+
         threading._start_new_thread(self.attend_clients, ())
         threading._start_new_thread(self.attend_new_nodes, ())
 
@@ -72,51 +76,13 @@ class Tracker:
 
         answer = {}
 
-        # name + infohash + "peers_complete"
-        ID = request['name'] + request['infohash'] + 'peers'
-        hashed = utils_tracker.get_key(ID)
-        answer["peers"] = self.database[request['name'] + request['infohash'] + 'peers']
-
-        # answer["complete"] = stats["complete"]
-        # answer["incomplete"] = stats["incomplete"]
-
-        # answer["interval"] = self._request_interval
-        # answer["min_interval"] = self._min_interval
-
-        # if request.tracker_id:
-        #     answer["tracker_id"] = request.tracker_id
-        # else:
-        #     answer["tracker_id"] = self._tracker_id
-
-        # elif request.type == "Scrape":
-        #     files = {}
-
-        #     collection = []
-        #     if request.infohashes:
-        #         collection = request.infohashes
-        #     else:
-        #         collection = self.database
-
-        #     for key in collection:
-        #             files[key] = {
-        #                 "complete": self.database[key]["complete"],
-        #                 "incomplete": self.database[key]["incomplete"],
-        #                 "downloaded": self.database[key]["downloaded"],
-        #                 "name": self.database[key]["name"]
-        #                 }
-
-        #     answer["files"] = files
-        # else:
-        #     raise Exception("Invalid type of request")
+        answer["peers"] = self.database[get_key(request['name'] + request['infohash'] + 'peers')]
 
         return answer
 
 
 app = flask.Flask(__name__)
 
-# DATABASE = {}
-
-# TRACKER = Tracker("0.0.0.0", 8000)
 TRACKER = None
 
 @app.route('/announce')
@@ -126,28 +92,34 @@ def announce():
 
 @app.route('/have/<client_id>/<ip>/<port>/<portion>/<name>/<infohash>', methods=["PUT"])
 def have(client_id, ip, port, portion, name, infohash):
-    # if portion == "complete":
-        # TRACKER.database[name][infohash]["peers_complete"].append({"ip": ip, "port": int(port), "id": client_id})
+
+    #real app
     TRACKER.database[name + infohash + "peers"] = utils_tracker.assign(data={"ip": ip, "port": int(port), "id": client_id}, to_update=True)
-    # else:
-    #     # TRACKER.database[name][infohash]["peers_incomplete"].append({"ip": ip, "port": int(port), "id": client_id})
-    #     TRACKER.database[name + infohash + "peers"] = utils_tracker.assign(data={"ip": ip, "port": int(port), "id": client_id}, to_update=True)
+
+    #develop
+    # try:
+    #     TRACKER.database[get_key(name + infohash + "peers")].append({"ip": ip, "port": int(port), "id": client_id})
+    # except:
+    #     TRACKER.database[get_key(name + infohash + "peers")] = [{"ip": ip, "port": int(port), "id": client_id}]
+
     return ""
 
 @app.route('/search')
 def search():
-    # metainfos = TRACKER.database[flask.request.args["name"]]
+    #Real app
     pattern_torrents_keys_dic = TRACKER.database[utils_tracker.INDEX_KEY]
     name = flask.request.args["name"]
     torrent_keys = pattern_torrents_keys_dic[name]
-    # torrents_keys [flask.request.args['name']]
-    # {'Maluma': [12831271, 32082198372]
-    # metainfo = TRACKER.Databse[32082198372]
+
     metainfos = []
     for key in torrent_keys:
         metainfo = TRACKER.database[key]
         metainfos.append(metainfo)
-    
+
+    #develop
+    # name = flask.request.args["name"]
+    # metainfos = TRACKER.database[name]
+
     return json.dumps(metainfos)
 
 @app.route('/metainfo/<client_id>/<ip>/<port>', methods=["POST"])
@@ -155,39 +127,24 @@ def metainfo(client_id, ip, port):
     if flask.request.method == "POST":
         metainfo_encoded = flask.request.data
         metainfo_decoded = torrent_parser.decode(metainfo_encoded)
-        name = metainfo_decoded["info"]["short_name"]
+        name = metainfo_decoded["info"]["name"]
         infohash = get_infohash(metainfo_decoded)
 
-        print(f'NAME: {name}')
-        ID = name + infohash + "peers"
-        hashed = utils_tracker.get_key(ID)
-        # print('SETTING metainfo')
+        #Real app
         TRACKER.database[name + infohash + "metainfo"] = utils_tracker.assign(metainfo_decoded, name)
+        TRACKER.database[name + infohash + "peers"] = utils_tracker.assign({"ip": ip, "port": int(port), "id": client_id}, to_update=True)
+
+        #develop
+        # try:
+        #     TRACKER.database[name].append(metainfo_decoded)
+        # except:
+        #     TRACKER.database[name] = [metainfo_decoded]
         
 
-        # print('SETTING peers list')
-        TRACKER.database[name + infohash + "peers"] = utils_tracker.assign({"ip": ip, "port": int(port), "id": client_id}, to_update=True)
-        # TRACKER.database[name + infohash + "peers_incomplete"] = []
-
-        # print_database()
         return ""
 
-# def print_database():
-#     print(".torrents:")
-
-#     for name in TRACKER.database:
-#         for infohash in TRACKER.database[name]:
-#             _metainfo = TRACKER.database[name][infohash]["metainfo"]
-#             print(f"name: {_metainfo['info']['short_name']}\textension: {_metainfo['info']['extension']}\tsize: {_metainfo['info']['length']}\tpiece length: {_metainfo['info']['piece_length']}\tpieces: {_metainfo['info']['no_pieces']}")
-#     print("---" * 40 + "\n")
-
-# @app.route('/scrape')
-# def scrape():
-#     request = ScrapeRequest(flask.request)
-#     response = TRACKER.build_response(request)
-#     return flask.Response(response)
-
 if __name__ == "__main__":
+    #real app
     import argparse, socket
     parser = argparse.ArgumentParser()
     parser.add_argument('-ip', '--ip', type=str, default=None)
@@ -198,9 +155,11 @@ if __name__ == "__main__":
     port = int(args.port)
 
     if not IP:
-        hostname = socket.gethostname()    
+        hostname = socket.gethostname()
         IP = socket.gethostbyname(hostname)
-    
+
     TRACKER = Tracker(IP, port)
+
+    # TRACKER = Tracker("localhost", 5000)
 
     app.run(host="0.0.0.0", port=5000)

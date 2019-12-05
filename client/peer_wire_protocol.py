@@ -63,6 +63,8 @@ class Peer:
         #handshake round
         print("Performing the handshake round...")
         for p in peers:
+            if p['ip'] == self.ip and p['port'] == self.client_port:
+                continue
 
             rp = f"({p['ip']}, {p['port'] + 1})"
             print(f"Connecting to {rp}")
@@ -136,14 +138,19 @@ class Peer:
         file_info["path"] = f"downloaded/{metainfo['info']['name']}"
         file_info["length"] = metainfo["info"]["length"]
 
+        #real app
         TRACKER_IP, TRACKER_PORT = self.check_tracker()
+
+        #dev
+        # TRACKER_IP = "localhost"
+        # TRACKER_PORT = 5000
         connection = http.client.HTTPConnection(TRACKER_IP, TRACKER_PORT)
         msg_sent = False
 
         for j, b in enumerate(peers_bitfields):
-            for i in range(len(b)):
-                if b[i] and not file_info["bitfield"][i]:
-                    try:
+            try:
+                for i in range(len(b)):
+                    if b[i] and not file_info["bitfield"][i]:
                         #connect to the peer
                         self.tcp_client = socket.socket()
                         addr = (active_peers[j]['ip'], active_peers[j]['port'] + 1)
@@ -151,7 +158,7 @@ class Peer:
 
                         #request the piece
                         print(f"Requesting piece {i}")
-                        piece(self.tcp_client, i, metainfo["info"]["name"], metainfo["info"]["piece_length"])
+                        piece(self.tcp_client, i, infohash, metainfo["info"]["piece_length"])
 
                         #download the piece
                         print(f"Copying piece {i}")
@@ -162,8 +169,11 @@ class Peer:
                         print(f"Piece {i} copied successfully")
 
                         #write the whole piece in the partial file of the download
-                        print(f"Copying piece {i}")
+                        # print(f"Copying piece {i}")
                         try:
+                            try:
+                                os.makedirs(f'downloaded')
+                            except: pass
                             with open(f"downloaded/{metainfo['info']['name']}", "r+b") as f:
                                 piece_length = metainfo["info"]["piece_length"]
                                 #set the offset of the file in the correct place of the piece
@@ -171,6 +181,9 @@ class Peer:
                                 #write the piece
                                 f.write(data)
                         except:
+                            try:
+                                os.makedirs(f'downloaded')
+                            except: pass
                             with open(f"downloaded/{metainfo['info']['name']}", "wb") as f:
                                 piece_length = metainfo["info"]["piece_length"]
                                 f.seek(piece_length * i, 0)
@@ -179,7 +192,7 @@ class Peer:
                         print(f"Piece {i} downloaded successfully")
 
                         if not msg_sent:
-                            connection.request("PUT", urllib.parse.quote(f"/have/{self.id}/{self.ip}/{self.client_port}/incomplete/{metainfo['info']['short_name']}/{infohash}"))
+                            connection.request("PUT", urllib.parse.quote(f"/have/{self.id}/{self.ip}/{self.client_port}/incomplete/{metainfo['info']['name']}/{infohash}"))
                             msg_sent = True
 
                         #mark the piece in the bitfield
@@ -192,8 +205,8 @@ class Peer:
                         #close the connection with tracker
                         connection.close()
 
-                    except (ConnectionResetError, ConnectionRefusedError, socket.timeout):
-                        pass
+            except (ConnectionResetError, ConnectionRefusedError, socket.timeout):
+                pass
 
         return self.files[infohash]["bitfield"]
 
@@ -253,7 +266,7 @@ class Peer:
             bitfield_answer(connection, self.files[msg['infohash']]["bitfield"])
 
         elif msg["message"] == "piece":
-            with open(f"{msg['file_name']}", "rb") as f:
+            with open(self.files[msg["infohash"]]["path"], "rb") as f:
                 f.seek(msg['index'] * msg['length'])
                 chunk = f.read(msg['length'])
                 data(connection, chunk)

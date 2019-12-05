@@ -18,7 +18,8 @@
     </div>
 
     <ul></ul>
-    <button type="button" class="btn btn-default btn-sm" style="background-color:green; color:white">Share New File</button>
+    <input v-model="path" placeholder="Write a path to share">
+    <button type="button" class="btn btn-default btn-sm" style="background-color:green; color:white" v-on:click="share()">Share New File</button>
     <!-- <button style="background-color:white;">Share New File</button> -->
 
   </div>
@@ -29,47 +30,35 @@ export default {
   name: 'SharedFiles',
   props: {
     msg: String,
-    pattern: String,
-    // downloding_list: [
-    //   {
-    //     id: 0,
-    //     name: 'Avengers',
-    //     size: 4 
-    //   },
-    //   {
-    //     id: 1,
-    //     name: 'Joker',
-    //     size: 5 
-    //   } 
-    // ]
+    path: String
   },
   data() {
     return{
-      downloding_list: [
-      {
-        id: 0,
-        name: 'Avengers',
-        size: '4 GB' 
-      },
-      {
-        id: 1,
-        name: 'Joker',
-        size: '5 GB' 
-      }, 
-      {
-        id: 2,
-        name: 'Wikipedia',
-        size: '24 GB'
-      },  
-    ]
+      downloding_list: [ 
+    ],
+
     };
   },
+  methods: {
+    share() {
+      // const postData = { path: this.path };
+      // this.$http.post("posts", postData)
+      // .then(res => {
+      //   res.body;
+      // });
+      fetch('http://192.168.1.104:5001/share', {
+        method: 'POST',
+        body:JSON.stringify( { path: this.path } )
+        }).then((res) => res.json());
+    },
+  },
+
   mounted() {
-      // fetch("http://localhost:5001/shared").then(function (response) {
-      //   return response.json();})
-      //   .then(function (result) {
-      //     this.downloding_list =  result;
-    // });
+      fetch("http://192.168.1.104:5001/shared").then(function (response) {
+        return response.json();})
+        .then(function (result) {
+          this.downloding_list =  result;
+    });
     },
 }
 </script>
