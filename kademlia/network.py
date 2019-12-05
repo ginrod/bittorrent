@@ -15,15 +15,15 @@ INDEX_KEY = 10
 
 def resetable(F):
     def wrapper(inst):
-        # while True:
-            # try:
-        F(inst)
-            # except (Exception, KeyboardInterrupt) as ex:
-            #     if isinstance(ex, KeyboardInterrupt):
-            #         print('NODO INTERRUMPIDO')
-            #         break
-            #     print('EL NODO SE HA REINICIADO DEBIDO A UNA EXCEPCIÓN')
-            #     print(ex)
+        while True:
+            try:
+                F(inst)
+            except (Exception, KeyboardInterrupt) as ex:
+                if isinstance(ex, KeyboardInterrupt):
+                    print('NODO INTERRUMPIDO')
+                    break
+                print('EL NODO SE HA REINICIADO DEBIDO A UNA EXCEPCIÓN')
+                print(ex)
 
     return wrapper
 
@@ -69,7 +69,7 @@ class Peer:
                     addr = data['sender'][1], data['sender'][2]
                     threading._start_new_thread(self.proccess_message, (data, addr))
 
-                self.node.print_routing_table()
+                # self.node.print_routing_table()
         except KeyboardInterrupt:
             self.__del__()
 
@@ -87,6 +87,8 @@ class Peer:
 
                     self.send_udp_msg(json.dumps(answer).encode(), addr)
                     self.update(tuple(data['sender']))
+                    print(f"{data['sender']} joined")
+
             else:
                 if addr != (self.node.ip, self.node.port):
                     ip, port = str(data['ip']), int(data['port'])
@@ -316,7 +318,7 @@ class Peer:
 
         now = datetime.datetime.now()
         threading._start_new_thread(self._update_kbucket_time, (idx, now))
-        self.node.print_routing_table()
+        # self.node.print_routing_table()
 
     def _update_kbucket_time(self, idx, t):
         if self.kBucketRefreshTimes[idx] >= t: return
@@ -527,7 +529,7 @@ class Peer:
             self.discover()
             time.sleep(1)
 
-        self.node.print_routing_table()
+        # self.node.print_routing_table()
 
     def sendall(self, msg, ip, port=9000, close=True):
         try:
@@ -709,7 +711,7 @@ class Peer:
             for dic in value:
                 if dic['id'] not in ids:
                     database[key]['value'].append(dic)
-                    
+
             utils.dump_json(database, self.node.storage)
             self.node.store_lock.release()
         else:
@@ -794,18 +796,21 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('-uport', '--udp_port', type=int, default=8000)
-    parser.add_argument('-id', '--id', type=int, default=0)
+    parser.add_argument('-id', '--id', type=int, default=-1)
     parser.add_argument('-tport', '--tcp_server_port', type=int, default=9000)
     parser.add_argument('-ip', '--ip', type=str, default=None)
 
     args = parser.parse_args()
 
-    ID = args.id
     IP = args.ip
-
     if not IP:
         hostname = socket.gethostname()
         IP = socket.gethostbyname(hostname)
+
+    import uuid
+    ID = int(args.id)
+    if ID == -1:
+        ID = utils.get_key(uuid.uuid4().hex)
 
     node = Node(ID, IP, int(args.udp_port), B=160, k=20, alpha=3)
     peer = Peer(node, int(args.tcp_server_port))

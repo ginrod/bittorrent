@@ -7,7 +7,7 @@ import torrent_parser
 import hashlib, sys
 
 # Kademlia ID used to do a name index in database
-INDEX_KEY = 10
+INDEX_KEY = 661843241451724053717825306583068845753374048118
 
 def get_key(s: str):
     h = hashlib.sha1(s.encode())
@@ -182,3 +182,21 @@ def assign(data, name='', to_update=False):
 def build_xor_table(address_space):
     xor_table = [[i ^ j for i in range(address_space)] for j in range(address_space)]
     return xor_table
+
+'''
+OJO: PARA BUSCAR EL IP AUTOMATICO EN LINUX
+'''
+
+# import socket
+# import fcntl
+# import struct
+
+# def get_ip_address(ifname):
+#     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     return socket.inet_ntoa(fcntl.ioctl(
+#         s.fileno(),
+#         0x8915,  # SIOCGIFADDR
+#         struct.pack('256s', ifname[:15])
+#     )[20:24])
+
+# get_ip_address('eth0')  # '192.168.0.110'

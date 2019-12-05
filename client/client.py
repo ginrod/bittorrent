@@ -9,14 +9,14 @@ import json
 import sys
 import urllib
 
-import threading
+import threading, utils_client
 
 PIECE_LENGTH = 1024
 
 
-TRACKER_IP = "localhost"
-TRACKER_PORT = "5000"
-TRACKER_URL = f"{TRACKER_IP}:{TRACKER_PORT}"
+# TRACKER_IP = None
+# TRACKER_PORT = None
+# TRACKER_URL = f"{TRACKER_IP}:{TRACKER_PORT}"
 
 def get_infohash(metainfo):
     return hashlib.sha1(torrent_parser.encode(metainfo["info"])).hexdigest()
@@ -27,12 +27,29 @@ class Client:
     # NO_PEER_ID = 0
     # COMPACT = 0
 
-    def __init__(self, ip, port):
+    '''
+    GET TRACKER
+    '''
+    def check_tracker(self):
+        import socket
+        sock = socket.socket()
+        try:
+            sock.connect((self.contact))
+        except:
+            self.contact = utils_client.find_contact(self.ip)
+
+        return self.contact
+
+    def get_tracker_url(self):
+        return f'{self.contact[0]}:{self.contact[1]}'
+
+    def __init__(self, ip, port, contact=None):
         self.ip = ip
         self.port = port
         self.id = hashlib.sha1((str(os.getpid()) + str(time.time())).encode()).hexdigest()
         self.tracker_id = None
         self.peer = Peer(self.ip, self.port, self.port + 1)
+        self.contact = contact
 
         threading._start_new_thread(self.peer.accept_connections,())
 
@@ -70,7 +87,7 @@ class Client:
         url = urllib.parse.urlencode({"name": name})
         connection.request("GET", f"/search?{url}")
         response = json.loads(connection.getresponse().read())
-        response = response[0] if response != "NO" else response 
+        response = response[0] if response != "NO" else response
 
         if response == "NO":
             raise Exception("There is not .torrent for that name")
@@ -91,9 +108,12 @@ class Client:
         downloaded = 0
         uploaded = 0
 
+        # _ = self.get_tracker_url()
+        # TRACKER_IP, TRACKER_PORT = self.contact
+        TRACKER_IP, TRACKER_PORT = self.check_tracker()
         connection = http.client.HTTPConnection(TRACKER_IP, TRACKER_PORT)
         print("Connected to TRACKER")
-        
+
         try:
             infohash, _metainfo = self.request_metainfo(connection, name)
         except Exception:
@@ -103,6 +123,8 @@ class Client:
         complete = False
 
         while not complete:
+            self.check_tracker()
+            TRACKER_URL = self.get_tracker_url()
             request = self.create_announce_request(_metainfo, TRACKER_URL, uploaded, downloaded, "started")
             response = self.make_announce_request(connection, request)
             bitfield = self.peer.download(response['peers'], _metainfo)
@@ -114,7 +136,9 @@ class Client:
 
     def share(self, path, mode="single-file", root_name=""):
         #create the .torrent
-        _metainfo = metainfo.create_metainfo([path], TRACKER_URL)
+        self.check_tracker()
+        TRACKER_URL = self.get_tracker_url()
+        _metainfo = metainfo.create_metainfo(path, TRACKER_URL)
         _metainfo_encoded = torrent_parser.encode(_metainfo)
 
         infohash = hashlib.sha1(torrent_parser.encode(_metainfo["info"])).hexdigest()
@@ -123,17 +147,20 @@ class Client:
         self.peer.files[infohash] = {"bitfield": [True for _ in range(_metainfo["info"]["length"]//_metainfo["info"]["piece_length"] + 1)],
                                      "piece_length": _metainfo["info"]["piece_length"],
                                     }
-        with open(f"files_shared{self.port}.json", 'w') as f:
+        with open(f"files_shared.json", 'w') as f:
             json.dump(self.peer.files, f)
 
         #connect to the tracker
+        TRACKER_IP, TRACKER_PORT = self.check_tracker()
         connection = http.client.HTTPConnection(TRACKER_IP, TRACKER_PORT)
 
         #upload the .torrent
         headers = {"Content-type": "text/plain"}
         connection.request("POST", f"/metainfo/{self.id}/{self.ip}/{self.port}", _metainfo_encoded, headers)
         connection.getresponse()
-        self._print(f"shared {_metainfo['info']['short_name']}{_metainfo['info']['extension']}")
+        self._print(f"shared {_metainfo['info']['name']}")
+
+        return _metainfo["info"]["name"], _metainfo["info"]["length"]
 
 
 def concat(command):
@@ -146,7 +173,7 @@ if __name__ == "__main__":
 
     import argparse, socket
     parser = argparse.ArgumentParser()
-    parser.add_argument('-port', '--port', type=int, default=7000)
+    parser.add_argument('-port', '--port', type=int, default=7008)
     parser.add_argument('-ip', '--ip', type=str, default='192.168.1.100')
 
     args = parser.parse_args()
