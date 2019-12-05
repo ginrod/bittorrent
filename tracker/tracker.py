@@ -44,7 +44,7 @@ class Tracker:
             try:
                 sock.connect((ip, port))
                 server_ip = self.database.ip
-                my_addr = server_ip, 6660
+                my_addr = server_ip, 5000
                 sock.send(json.dumps(my_addr).encode())
             except: pass
             sock.close()

@@ -10,10 +10,26 @@ import utils_client
 import http.client
 import urllib
 
-TRACKER_IP = "localhost"
-TRACKER_PORT = 5000
+# TRACKER_IP = None
+# TRACKER_PORT = None
 
 class Peer:
+
+    '''
+    GET TRACKER
+    '''
+    def check_tracker(self):
+        import socket
+        sock = socket.socket()
+        try:
+            sock.connect((self.contact))
+        except:
+            self.contact = utils_client.find_contact(self.ip)
+            # TRACKER_IP, TRACKER_PORT = self.contact
+            # TRACKER_URL = f"{TRACKER_IP}:{TRACKER_PORT}"
+        
+        return self.contact
+
     """ Represents a network node that participates in a file exchange """
     def __init__(self, ip, client_port, server_port):
         #Generate an id related to the local machine
@@ -110,6 +126,7 @@ class Peer:
         file_info["bitfield"] = [False for _ in range(metainfo["info"]["no_pieces"])]
         file_info["piece_length"] = metainfo["info"]["piece_length"]
 
+        TRACKER_IP, TRACKER_PORT = self.check_tracker()
         connection = http.client.HTTPConnection(TRACKER_IP, TRACKER_PORT)
         msg_sent = False
 

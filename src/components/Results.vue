@@ -1,7 +1,7 @@
 <template>
   <div class="results">
     <h1>
-      Results of the search of {{pattern}}
+      Results of the search of {{ msg }}
     </h1>
 
     <!-- <input type = "radio"
@@ -128,7 +128,21 @@ export default {
   props: {
     msg: String,
     pattern: String
-  }
+  },
+  methods:{
+    
+  },
+  created() {
+      
+    },
+    mounted() {
+      this.pattern = this.$route.query.pattern;
+      this.msg = this.pattern;
+      if (this.pattern === undefined) {
+        this.pattern = ""
+        this.msg = "[All]"
+      }
+    },
 }
 </script>
 

@@ -62,7 +62,15 @@ export default {
   props: {
     msg: String,
     pattern: String
-  }
+  },
+  mounted() {
+      fetch("http://192.168.1.104:5001/downloading").then(function (response) {
+        return response.json();})
+        .then(function (result) {
+          this.downloding_list =  result;
+          alert(this.downloding_list)   
+    });
+    },
 }
 </script>
 

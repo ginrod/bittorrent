@@ -69,7 +69,7 @@ class Peer:
                     addr = data['sender'][1], data['sender'][2]
                     threading._start_new_thread(self.proccess_message, (data, addr))
 
-                self.node.print_routing_table()
+                # self.node.print_routing_table()
         except KeyboardInterrupt:
             self.__del__()
 
@@ -87,6 +87,8 @@ class Peer:
 
                     self.send_udp_msg(json.dumps(answer).encode(), addr)
                     self.update(tuple(data['sender']))
+                    print(f"{data['sender']} joined")
+
             else:
                 if addr != (self.node.ip, self.node.port):
                     ip, port = str(data['ip']), int(data['port'])
@@ -316,7 +318,7 @@ class Peer:
 
         now = datetime.datetime.now()
         threading._start_new_thread(self._update_kbucket_time, (idx, now))
-        self.node.print_routing_table()
+        # self.node.print_routing_table()
 
     def _update_kbucket_time(self, idx, t):
         if self.kBucketRefreshTimes[idx] >= t: return
@@ -527,7 +529,7 @@ class Peer:
             self.discover()
             time.sleep(1)
 
-        self.node.print_routing_table()
+        # self.node.print_routing_table()
 
     def sendall(self, msg, ip, port=9000, close=True):
         try:
