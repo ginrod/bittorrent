@@ -84,18 +84,6 @@ class Client:
 
         return url
 
-    def request_metainfo(self, connection, name):
-        url = urllib.parse.urlencode({"name": name})
-        connection.request("GET", f"/search?{url}")
-        response = json.loads(connection.getresponse().read())
-        response = response[0] if response != "NO" else response
-
-        if response == "NO":
-            raise Exception("There is not .torrent for that name")
-
-        infohash = get_infohash(response)
-        # return [(key, response[key]["metainfo"]) for key in response]
-        return infohash, response
 
     def make_announce_request(self, connection, url):
         connection.request("GET", url)
@@ -104,24 +92,15 @@ class Client:
         data = json.loads(r)
         return data
 
-    def download(self, name):
-        print(f"Downloading {name}...")
+    def download(self, _metainfo):
+        # print(f"Downloading {name}...")
         downloaded = 0
         uploaded = 0
 
         #real app
-        # _ = self.get_tracker_url()
-        # TRACKER_IP, TRACKER_PORT = self.contact
-        #TRACKER_IP, TRACKER_PORT = self.check_tracker()
-
+        TRACKER_IP, TRACKER_PORT = self.check_tracker()
         connection = http.client.HTTPConnection(TRACKER_IP, TRACKER_PORT)
         print("Connected to TRACKER")
-
-        try:
-            infohash, _metainfo = self.request_metainfo(connection, name)
-        except Exception:
-            print(f"The tracker doesn't know about any torrent of name: {name}")
-            return
 
         complete = False
 
@@ -129,7 +108,7 @@ class Client:
             #real app
             # self.check_tracker()
             # TRACKER_URL = self.get_tracker_url()
-            request = self.create_announce_request(_metainfo, TRACKER_URL, uploaded, downloaded, "started")
+            request =  self.create_announce_request(_metainfo, TRACKER_URL, uploaded, downloaded, "started")
             response = self.make_announce_request(connection, request)
             bitfield = self.peer.download(response['peers'], _metainfo)
             complete = all(bitfield)
@@ -137,6 +116,14 @@ class Client:
         # connection.request("PUT", urllib.parse.quote(f"/have/{self.id}/{self.ip}/{self.port}/complete/{_metainfo['info']['name']}/{infohash}"))
         self._print(f"downloaded successfully: {_metainfo['info']['name']}")
         connection.close()
+
+    def search(self, name):
+        url = urllib.parse.urlencode({"name": name})
+        TRACKER_IP, TRACKER_PORT = self.check_tracker()
+        connection = http.client.HTTPConnection(TRACKER_IP, TRACKER_PORT)
+        connection.request("GET", f"/search?{url}")
+        response = json.loads(connection.getresponse().read())
+        return response
 
     def share(self, path):
         #create the .torrent
@@ -184,7 +171,7 @@ def concat(command):
         path += s
     return path
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
     # import argparse, socket
     # parser = argparse.ArgumentParser()
