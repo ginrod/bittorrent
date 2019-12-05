@@ -8,44 +8,12 @@
       <table align="center" border="1">
           <tr>
               <th>Name</th>
-              <th>Extension</th>
               <th>Size</th>
           </tr>
-          <tr>
-              <td>Dummy1</td>
-              <td>Yes</td>
-              <td>1.0 GB</td>
-          </tr>
-          <tr>
-              <td>The Lion King</td>
-              <td>No</td>
-              <td>300 MB</td>
-          </tr>
-          <tr>
-              <td>Dummy2</td>
-              <td>Yes</td>
-              <td>0%</td>
-          </tr>
-          <tr>
-              <td>Dummy2 Largooooooooooooooooooooooooooooooooooooooooo</td>
-              <td>Yes</td>
-              <td>0%</td>
-          </tr>
-          <tr>
-              <td>Dummy2</td>
-              <td>Yes</td>
-              <td>0%</td>
-          </tr>
-          <tr>
-              <td>Dummy2</td>
-              <td>Yes</td>
-              <td>0%</td>
-          </tr>
-          <tr>
-              <td>Dummy2</td>
-              <td>Yes</td>
-              <td>0%</td>
-          </tr>
+          <tr v-for="el in downloding_list" :key="el.id">
+            <td>{{el.name}}</td>
+            <td>{{el.size}}</td>
+          </tr>          
       </table>
     </div>
 
@@ -61,15 +29,47 @@ export default {
   name: 'SharedFiles',
   props: {
     msg: String,
-    pattern: String
+    pattern: String,
+    // downloding_list: [
+    //   {
+    //     id: 0,
+    //     name: 'Avengers',
+    //     size: 4 
+    //   },
+    //   {
+    //     id: 1,
+    //     name: 'Joker',
+    //     size: 5 
+    //   } 
+    // ]
+  },
+  data() {
+    return{
+      downloding_list: [
+      {
+        id: 0,
+        name: 'Avengers',
+        size: '4 GB' 
+      },
+      {
+        id: 1,
+        name: 'Joker',
+        size: '5 GB' 
+      }, 
+      {
+        id: 2,
+        name: 'Wikipedia',
+        size: '24 GB'
+      },  
+    ]
+    };
   },
   mounted() {
-      fetch("http://192.168.1.104:5001/downloading").then(function (response) {
-        return response.json();})
-        .then(function (result) {
-          this.downloding_list =  result;
-          alert(this.downloding_list)   
-    });
+      // fetch("http://localhost:5001/shared").then(function (response) {
+      //   return response.json();})
+      //   .then(function (result) {
+      //     this.downloding_list =  result;
+    // });
     },
 }
 </script>

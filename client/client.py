@@ -37,9 +37,9 @@ class Client:
             sock.connect((self.contact))
         except:
             self.contact = utils_client.find_contact(self.ip)
-        
+
         return self.contact
-    
+
     def get_tracker_url(self):
         return f'{self.contact[0]}:{self.contact[1]}'
 
@@ -87,7 +87,7 @@ class Client:
         url = urllib.parse.urlencode({"name": name})
         connection.request("GET", f"/search?{url}")
         response = json.loads(connection.getresponse().read())
-        response = response[0] if response != "NO" else response 
+        response = response[0] if response != "NO" else response
 
         if response == "NO":
             raise Exception("There is not .torrent for that name")
@@ -113,7 +113,7 @@ class Client:
         TRACKER_IP, TRACKER_PORT = self.check_tracker()
         connection = http.client.HTTPConnection(TRACKER_IP, TRACKER_PORT)
         print("Connected to TRACKER")
-        
+
         try:
             infohash, _metainfo = self.request_metainfo(connection, name)
         except Exception:
@@ -138,7 +138,7 @@ class Client:
         #create the .torrent
         self.check_tracker()
         TRACKER_URL = self.get_tracker_url()
-        _metainfo = metainfo.create_metainfo([path], TRACKER_URL)
+        _metainfo = metainfo.create_metainfo(path, TRACKER_URL)
         _metainfo_encoded = torrent_parser.encode(_metainfo)
 
         infohash = hashlib.sha1(torrent_parser.encode(_metainfo["info"])).hexdigest()
@@ -147,7 +147,7 @@ class Client:
         self.peer.files[infohash] = {"bitfield": [True for _ in range(_metainfo["info"]["length"]//_metainfo["info"]["piece_length"] + 1)],
                                      "piece_length": _metainfo["info"]["piece_length"],
                                     }
-        with open(f"files_shared{self.port}.json", 'w') as f:
+        with open(f"files_shared.json", 'w') as f:
             json.dump(self.peer.files, f)
 
         #connect to the tracker
@@ -158,7 +158,9 @@ class Client:
         headers = {"Content-type": "text/plain"}
         connection.request("POST", f"/metainfo/{self.id}/{self.ip}/{self.port}", _metainfo_encoded, headers)
         connection.getresponse()
-        self._print(f"shared {_metainfo['info']['short_name']}{_metainfo['info']['extension']}")
+        self._print(f"shared {_metainfo['info']['name']}")
+
+        return _metainfo["info"]["name"], _metainfo["info"]["length"]
 
 
 def concat(command):

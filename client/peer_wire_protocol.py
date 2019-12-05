@@ -27,7 +27,7 @@ class Peer:
             self.contact = utils_client.find_contact(self.ip)
             # TRACKER_IP, TRACKER_PORT = self.contact
             # TRACKER_URL = f"{TRACKER_IP}:{TRACKER_PORT}"
-        
+
         return self.contact
 
     """ Represents a network node that participates in a file exchange """
@@ -47,7 +47,7 @@ class Peer:
         self.tcp_server.bind((self.ip, self.server_port))
         self.tcp_server.listen(256)
 
-        self.files = utils_client.load_json(f"files_shared{self.client_port}.json")
+        self.files = utils_client.load_json(f"files_shared.json")
 
 
     def download(self, peers, metainfo):
@@ -63,13 +63,21 @@ class Peer:
         #handshake round
         print("Performing the handshake round...")
         for p in peers:
+
             rp = f"({p['ip']}, {p['port'] + 1})"
             print(f"Connecting to {rp}")
             self.tcp_client = socket.socket()
-            self.tcp_client.connect((p["ip"], p["port"] + 1))
+            try:
+                self.tcp_client.connect((p["ip"], p["port"] + 1))
+            except (ConnectionRefusedError, ConnectionResetError):
+                continue
+
             print(f"Sending handshake msg to {rp}")
             handshake(self.tcp_client, infohash, self.id)
-            handshake_answer = self.tcp_client.recv(1024)
+            try:
+                handshake_answer = self.tcp_client.recv(1024)
+            except:
+                continue
             print(f"Handshake answer from {rp} received")
             if not handshake_answer:
                 print(f"The handshake msg from {rp} is empty")
@@ -125,6 +133,8 @@ class Peer:
         file_info = self.files[infohash]
         file_info["bitfield"] = [False for _ in range(metainfo["info"]["no_pieces"])]
         file_info["piece_length"] = metainfo["info"]["piece_length"]
+        file_info["path"] = f"downloaded/{metainfo['info']['name']}"
+        file_info["length"] = metainfo["info"]["length"]
 
         TRACKER_IP, TRACKER_PORT = self.check_tracker()
         connection = http.client.HTTPConnection(TRACKER_IP, TRACKER_PORT)
@@ -154,14 +164,14 @@ class Peer:
                         #write the whole piece in the partial file of the download
                         print(f"Copying piece {i}")
                         try:
-                            with open(f"downloaded/{metainfo['info']['short_name']}{metainfo['info']['extension']}", "r+b") as f:
+                            with open(f"downloaded/{metainfo['info']['name']}", "r+b") as f:
                                 piece_length = metainfo["info"]["piece_length"]
                                 #set the offset of the file in the correct place of the piece
                                 f.seek(piece_length * i, 0)
                                 #write the piece
                                 f.write(data)
                         except:
-                            with open(f"downloaded/{metainfo['info']['short_name']}{metainfo['info']['extension']}", "wb") as f:
+                            with open(f"downloaded/{metainfo['info']['name']}", "wb") as f:
                                 piece_length = metainfo["info"]["piece_length"]
                                 f.seek(piece_length * i, 0)
                                 f.write(data)
@@ -176,7 +186,7 @@ class Peer:
                         self.files[infohash]["bitfield"][i] = True
 
                         #update the 'files_shared' file
-                        with open(f"files_shared{self.client_port}.json", "w") as json_file:
+                        with open(f"files_shared.json", "w") as json_file:
                             json.dump(self.files, json_file)
 
                         #close the connection with tracker

@@ -6,18 +6,17 @@ def generate_hash(piece, hash_func):
     h = hash_func(piece)
     return h.hexdigest()
 
-def generate_pieces(paths, piece_length):
+def generate_pieces(path, piece_length):
     pieces = []
     i = 0
-    for path in paths:
-        with open(path, "rb") as file:
-            while True:
-                piece = file.read(piece_length)
-                if not piece:
-                    break
-                pieces.append(generate_hash(piece, hashlib.sha1))
-                print(f"Piece {i} generated")
-                i += 1
+    with open(path, "rb") as file:
+        while True:
+            piece = file.read(piece_length)
+            if not piece:
+                break
+            pieces.append(generate_hash(piece, hashlib.sha1))
+            print(f"Piece {i} generated")
+            i += 1
     return pieces
 
 def choose_piece_length(file_size):
@@ -33,14 +32,14 @@ def choose_piece_length(file_size):
 
     return piece_length
 
-def create_metainfo(paths, announce, announce_list=[], mode="single-file", encoding="utf-8", comment="", created_by="", multiple_file_name="torent_files"):
-    size = os.stat(paths[0]).st_size
+def create_metainfo(path, announce, announce_list=[], encoding="utf-8", comment="", created_by="", multiple_file_name="torent_files"):
+    size = os.stat(path).st_size
     # piece_length = choose_piece_length(size)
     piece_length = MAX_PIECE_SIZE
     metainfo = {
         "info": {
             "piece_length": piece_length,
-            "pieces": generate_pieces(paths, piece_length)
+            "pieces": generate_pieces(path, piece_length)
         },
 
         "announce": announce,
@@ -51,42 +50,9 @@ def create_metainfo(paths, announce, announce_list=[], mode="single-file", encod
         "encoding": encoding
     }
 
-    if mode == "single-file":
-        with open(paths[0]) as file:
-            metainfo["info"]["name"] = paths[0]
-
-            import platform
-            osystem = platform.system()
-
-            if osystem == 'Linux':
-                try:
-                    metainfo["info"]["short_name"] = file.name[file.name.rfind('/') + 1: file.name.rfind('.')]
-                except:
-                    metainfo["info"]["short_name"] = file.name[file.name.rfind('/') + 1:]
-            else:
-                last_route = max(file.name.rfind('/'), file.name.rfind('\\')) + 1
-                end_name = len(file.name) if file.name.rfind('.') == -1 else file.name.rfind('.') 
-                metainfo["info"]["short_name"] = file.name[last_route:end_name]
-
-            try:
-                metainfo["info"]["extension"] = file.name[file.name.rfind('.'):]
-            except:
-                metainfo["info"]["extension"] = "None"
-
-            metainfo["info"]["length"] = size
-            metainfo["info"]["no_pieces"] = metainfo["info"]["length"] // metainfo["info"]["piece_length"] + 1
-
-    elif mode == "multiple-file":
-        files = []
-        for path in paths:
-            with open(path) as f:
-                files.append({'path': path, 'length': os.stat(path).st_size})
-        metainfo["info"]["files"] = files
-
-        metainfo["info"]["short_name"] = multiple_file_name
-        metainfo['info']['extension'] = ""
-
-    else: raise Exception("Invalid file mode")
+    metainfo["info"]["name"] = os.path.basename(path)
+    metainfo["info"]["length"] = size
+    metainfo["info"]["no_pieces"] = metainfo["info"]["length"] // metainfo["info"]["piece_length"] + 1
 
     return metainfo
 
