@@ -8,49 +8,18 @@
       <table align="center" border="1">
           <tr>
               <th>Name</th>
-              <th>Extension</th>
               <th>Size</th>
           </tr>
-          <tr>
-              <td>Dummy1</td>
-              <td>Yes</td>
-              <td>1.0 GB</td>
-          </tr>
-          <tr>
-              <td>The Lion King</td>
-              <td>No</td>
-              <td>300 MB</td>
-          </tr>
-          <tr>
-              <td>Dummy2</td>
-              <td>Yes</td>
-              <td>0%</td>
-          </tr>
-          <tr>
-              <td>Dummy2 Largooooooooooooooooooooooooooooooooooooooooo</td>
-              <td>Yes</td>
-              <td>0%</td>
-          </tr>
-          <tr>
-              <td>Dummy2</td>
-              <td>Yes</td>
-              <td>0%</td>
-          </tr>
-          <tr>
-              <td>Dummy2</td>
-              <td>Yes</td>
-              <td>0%</td>
-          </tr>
-          <tr>
-              <td>Dummy2</td>
-              <td>Yes</td>
-              <td>0%</td>
-          </tr>
+          <tr v-for="el in downloding_list" :key="el.id">
+            <td>{{el.name}}</td>
+            <td>{{el.size}}</td>
+          </tr>          
       </table>
     </div>
 
     <ul></ul>
-    <button type="button" class="btn btn-default btn-sm" style="background-color:green; color:white">Share New File</button>
+    <input v-model="path" placeholder="Write a path to share">
+    <button type="button" class="btn btn-default btn-sm" style="background-color:green; color:white" v-on:click="share()">Share New File</button>
     <!-- <button style="background-color:white;">Share New File</button> -->
 
   </div>
@@ -61,8 +30,36 @@ export default {
   name: 'SharedFiles',
   props: {
     msg: String,
-    pattern: String
-  }
+    path: String
+  },
+  data() {
+    return{
+      downloding_list: [ 
+    ],
+
+    };
+  },
+  methods: {
+    share() {
+      // const postData = { path: this.path };
+      // this.$http.post("posts", postData)
+      // .then(res => {
+      //   res.body;
+      // });
+      fetch('http://192.168.1.104:5001/share', {
+        method: 'POST',
+        body:JSON.stringify( { path: this.path } )
+        }).then((res) => res.json());
+    },
+  },
+
+  mounted() {
+      fetch("http://192.168.1.104:5001/shared").then(function (response) {
+        return response.json();})
+        .then(function (result) {
+          this.downloding_list =  result;
+    });
+    },
 }
 </script>
 

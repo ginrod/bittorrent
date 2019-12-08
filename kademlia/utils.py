@@ -90,7 +90,7 @@ def dump_json(data, path):
         json.dump(data, json_file, default=parse_to_json)
 
 def dumps_json(data) -> str:
-    return json.dumps(data, default=parse_to_json)
+    return json.dumps(data, default=parse_to_json, indent=4)
 
 
 

@@ -3,7 +3,7 @@
     <img alt="Vue logo" src="./assets/logo.png">
     <!-- <index></index> -->
     <!-- <shared-files></shared-files> -->
-    <!-- <results></results> -->
+    <results></results>
     <!-- <HelloWorld msg="Welcome to Your Vue.js App"/> -->
     <router-view></router-view>
   </div>
@@ -20,7 +20,7 @@ export default {
   // components: {
   //   'index': Index,
   //   // 'shared-files': SharedFiles,
-  //   'results': Results,
+    // 'results': Results,
   // },
   data() {
     return {

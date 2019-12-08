@@ -15,7 +15,7 @@ def generate_pieces(path, piece_length):
             if not piece:
                 break
             pieces.append(generate_hash(piece, hashlib.sha1))
-            print(f"Piece {i} generated")
+            # print(f"Piece {i} generated")
             i += 1
     return pieces
 

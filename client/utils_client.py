@@ -1,10 +1,10 @@
 import json, hashlib, torrent_parser, socket
 
 def find_contact(ip, port=37000, localhost_only=False):
-    broadcast_msg = { 'operation': 'DISCOVER', 'join': False, 'ip': ip, 'port': port, 
+    broadcast_msg = { 'operation': 'DISCOVER', 'join': False, 'ip': ip, 'port': port,
                         'sender': [-1, ip, port]  }
     broadcast_msg = json.dumps(broadcast_msg).encode()
-    
+
     def do_broadcast():
         udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         if localhost_only:
@@ -22,16 +22,16 @@ def find_contact(ip, port=37000, localhost_only=False):
     # Set socket as server
     server = socket.socket()
     server.settimeout(0.5)
-    # try:    
+    # try:
     server.bind(('', port))
     # except Exception as ex:
     #     pass
 
     server.listen(1)
     dht_peer, _ = server.accept()
-    # self.contact = tuple(json.loads(self._recvall(dht_peer)))        
-    contact = tuple(json.loads(dht_peer.recv(1024)))        
-    
+    # self.contact = tuple(json.loads(self._recvall(dht_peer)))
+    contact = tuple(json.loads(dht_peer.recv(1024)))
+
     # Set socket as client
     # self.close_connection()
     server.close()
@@ -41,9 +41,8 @@ def load_json(path):
     data = {}
     try:
         with open(path) as json_file:
-            data = parse_from_json(json.load(json_file))
+            data = json.load(json_file)
     except:
-        # dump_json(data, path)
         pass
 
     return data
