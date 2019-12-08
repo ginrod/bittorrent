@@ -31,13 +31,22 @@ class Client:
     '''
     GET TRACKER
     '''
+    def get_connection(self):
+        while not self.contact:
+            try :
+                self.contact = utils_client.find_contact(self.ip)
+            except:
+                pass
+            # time.sleep(0.5)
+
     def check_tracker(self):
         import socket
         sock = socket.socket()
         try:
             sock.connect((self.contact))
-        except:
-            self.contact = utils_client.find_contact(self.ip)
+        except Exception as ex:
+            self.contact = None
+            self.get_connection()
 
         return self.contact
 
@@ -84,18 +93,13 @@ class Client:
 
         return url
 
-    def request_metainfo(self, connection, name):
+    def request_metainfo(self, name):
+        TRACKER_IP, TRACKER_PORT = self.check_tracker()
+        connection = http.client.HTTPConnection(TRACKER_IP, TRACKER_PORT)
         url = urllib.parse.urlencode({"name": name})
         connection.request("GET", f"/search?{url}")
         response = json.loads(connection.getresponse().read())
-        response = response[0] if response != "NO" else response
-
-        if response == "NO":
-            raise Exception("There is not .torrent for that name")
-
-        infohash = get_infohash(response)
-        # return [(key, response[key]["metainfo"]) for key in response]
-        return infohash, response
+        return response
 
     def make_announce_request(self, connection, url):
         connection.request("GET", url)
@@ -104,42 +108,55 @@ class Client:
         data = json.loads(r)
         return data
 
-    def download(self, name):
-        print(f"Downloading {name}...")
+    def download(self, _metainfo):
+        print(f"Downloading {_metainfo['info']['name']}...")
         downloaded = 0
         uploaded = 0
 
-        #real app
-        # _ = self.get_tracker_url()
-        # TRACKER_IP, TRACKER_PORT = self.contact
-        TRACKER_IP, TRACKER_PORT = self.check_tracker()
-
-        connection = http.client.HTTPConnection(TRACKER_IP, TRACKER_PORT)
+        # TRACKER_IP, TRACKER_PORT = self.check_tracker()
+        # connection = http.client.HTTPConnection(TRACKER_IP, TRACKER_PORT)
         print("Connected to TRACKER")
 
-        try:
-            infohash, _metainfo = self.request_metainfo(connection, name)
-        except Exception:
-            print(f"The tracker doesn't know about any torrent of name: {name}")
-            return
+        infohash = utils_client.get_infohash(_metainfo)
+
+        self.peer.files_shared_lock.acquire()
+        self.peer.files[infohash] = {}
+        file_info = self.peer.files[infohash]
+        file_info["bitfield"] = [False for _ in range(_metainfo["info"]["no_pieces"])]
+        file_info["piece_length"] = _metainfo["info"]["piece_length"]
+        file_info["path"] = f"downloaded/{_metainfo['info']['name']}"
+        file_info["length"] = _metainfo["info"]["length"]
+        with open(f"files_shared.json", "w") as json_file:
+            json.dump(self.peer.files, json_file)
+        self.peer.files_shared_lock.release()
 
         complete = False
+        start = 0
 
         while not complete:
             #real app
-            self.check_tracker()
+            TRACKER_IP, TRACKER_PORT = self.check_tracker()
+            connection = http.client.HTTPConnection(TRACKER_IP, TRACKER_PORT)
             TRACKER_URL = self.get_tracker_url()
             request = self.create_announce_request(_metainfo, TRACKER_URL, uploaded, downloaded, "started")
             response = self.make_announce_request(connection, request)
-            bitfield = self.peer.download(response['peers'], _metainfo)
-            complete = all(bitfield)
+            start = self.peer.download(response['peers'], _metainfo, start)
+            complete = (start == _metainfo['info']['no_pieces'])
 
-        # connection.request("PUT", urllib.parse.quote(f"/have/{self.id}/{self.ip}/{self.port}/complete/{_metainfo['info']['name']}/{infohash}"))
-        self._print(f"downloaded successfully: {_metainfo['info']['name']}")
-        connection.close()
+        try: connection.close()
+        except: pass
+        print(f"{_metainfo['info']['name']} downloaded successfully!!")
+
+    def perform_download(self, _metainfo):
+        threading._start_new_thread(self.download, (_metainfo,))
+
+    def perform_share(self, path):
+        threading._start_new_thread(self.share, (path,))
 
     def share(self, path):
         #create the .torrent
+
+        print(f"sharing {path}")
 
         #real app
         self.check_tracker()
@@ -151,6 +168,7 @@ class Client:
         infohash = hashlib.sha1(torrent_parser.encode(_metainfo["info"])).hexdigest()
 
         #update the files_shared.json
+        self.peer.files_shared_lock.acquire()
         self.peer.files[infohash] = {"bitfield": [True for _ in range(_metainfo["info"]["length"]//_metainfo["info"]["piece_length"] + 1)],
                                      "piece_length": _metainfo["info"]["piece_length"],
                                      "path": path
@@ -159,11 +177,11 @@ class Client:
         with open(f"files_shared.json", 'w') as f:
             json.dump(self.peer.files, f)
 
+        self.peer.files_shared_lock.release()
+
         #connect to the tracker
         #real app
         TRACKER_IP, TRACKER_PORT = self.check_tracker()
-
-
         connection = http.client.HTTPConnection(TRACKER_IP, TRACKER_PORT)
 
         #upload the .torrent
@@ -173,7 +191,7 @@ class Client:
 
         connection.request("PUT", urllib.parse.quote(f"/have/{self.id}/{self.ip}/{self.port}/complete/{_metainfo['info']['name']}/{infohash}"))
 
-        self._print(f"shared {_metainfo['info']['name']}")
+        print(f"shared: {_metainfo['info']['name']}")
 
         return _metainfo["info"]["name"], _metainfo["info"]["length"]
 
@@ -189,7 +207,7 @@ if __name__ == "__main__":
     import argparse, socket
     parser = argparse.ArgumentParser()
     parser.add_argument('-port', '--port', type=int, default=7008)
-    parser.add_argument('-ip', '--ip', type=str, default='192.168.1.101')
+    parser.add_argument('-ip', '--ip', type=str, default='192.168.1.102')
 
     args = parser.parse_args()
 
@@ -200,30 +218,25 @@ if __name__ == "__main__":
         hostname = socket.gethostname()
         ip = socket.gethostbyname(hostname)
 
-    # ip = "localhost"
-    # port = int(input("port:"))
     c = Client(ip, port)
 
     while True:
-        op, param = input('>>>').split('|')
-        if op == 'share':
-            c.share(param)
-        elif op == 'get':
-            c.download(param)
-        elif op == 'exit':
-            break
-
-        # command = input(">>>").split()
-        # if not command:
-        #     continue
-        # elif command[0] == "share":
-        #     if len(command == 2):
-        #         c.share(int(command[1]))
-        #     else:
-        #         c.share([int(p) for p in command[2:]], root_name=command[1])
-        # elif command[0] == "get":
-        #     c.download(names[int(command[1])])
-        # elif command[0] == "exit":
-        #     break
-        # else:
-        #     continue
+        try:
+            op, param = input('>>>').split('|')
+            if op == 'share':
+                c.perform_share(param)
+            elif op == 'get':
+                _metainfos = c.request_metainfo(param.lower().strip())
+                if _metainfos == []:
+                    print("There isn't a torrent for that name on the network")
+                for i, m in enumerate(_metainfos):
+                    print(f"{i}. {m['info']['name']}")
+                idx = int(input("Select file to download:"))
+                c.perform_download(_metainfos[idx])
+            elif op == 'exit':
+                break
+            else:
+                continue
+        except Exception as e:
+            print(e)
+            continue

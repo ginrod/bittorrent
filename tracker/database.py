@@ -3,10 +3,10 @@ import socket, json, threading, time, utils_tracker
 class Database:
 
     def find_contact(self, localhost_only=False):
-        broadcast_msg = { 'operation': 'DISCOVER', 'join': False, 'ip': self.ip, 'port': self.port, 
+        broadcast_msg = { 'operation': 'DISCOVER', 'join': False, 'ip': self.ip, 'port': self.port,
                           'sender': [-1, self.ip, self.port]  }
         broadcast_msg = json.dumps(broadcast_msg).encode()
-        
+
         def do_broadcast():
             udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             if localhost_only:
@@ -23,33 +23,35 @@ class Database:
 
         # Set socket as server
         server = socket.socket()
-        server.settimeout(0.5)
-        # try:    
+        server.settimeout(2)
+        # try:
         server.bind(('', self.port))
         # except Exception as ex:
         #     pass
 
         server.listen(1)
         dht_peer, _ = server.accept()
-        self.contact = tuple(json.loads(self._recvall(dht_peer)))        
-        
+        self.contact = tuple(json.loads(self._recvall(dht_peer)))
+
         # Set socket as client
         # self.close_connection()
         server.close()
 
     def get_connection(self):
         while not self.contact:
-            try : 
+            try :
                 self.find_contact()
-            except: 
+            except Exception as ex:
                 pass
-            time.sleep(0.5)
+            # time.sleep(0.5)
+        
+        return self.contact
 
     def _recvall(self, sock):
         data = b''
-        while True: 
+        while True:
             chunk = sock.recv(1024)
-            if not chunk: 
+            if not chunk:
                 break
             if chunk.endswith(b'\r\n\r\n'):
                 data += chunk[0:-4]
@@ -64,7 +66,7 @@ class Database:
         # self.contact = ('192.168.1.100', 9000)
 
     def __getitem__(self, ID):
-   
+
         def get(sock):
             msg = utils_tracker.build_LOOKUP_msg(ID)
             sock.sendall(json.dumps(msg).encode() + b'\r\n\r\n')
@@ -76,23 +78,23 @@ class Database:
             if not founded: value = None
             # if not founded: raise Exception('El valor no está en la base de datos')
 
-            return json.loads(value)
+            return json.loads(value) if value else None
 
         if isinstance(ID, str): ID = utils_tracker.get_key(ID)
-        sock = socket.socket() 
+        sock = socket.socket()
         try:
             sock.connect((self.contact))
             value = get(sock)
             utils_tracker.close_connection(sock)
-            return value['value']
+            return value['value'] if value else None
         except Exception as ex:
             print(ex)
-            self.get_connection()
-            sock.connect((self.contact))
-        
+            self.contact = None
+            sock.connect(self.get_connection())
+
         value = get(sock)
         utils_tracker.close_connection(sock)
-        return value['value']
+        return value['value'] if value else None
 
     def _send_bytes(self, bytes_array):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -107,20 +109,21 @@ class Database:
 
     def _setname(self, name, ID):
         sock = socket.socket()
-        
+
         def post():
             msg = utils_tracker.build_PUBLISH_msg(utils_tracker.INDEX_KEY, (name, ID), to_update=True)
             sock.sendall(json.dumps(msg).encode())
-            
+
         try:
             sock.connect((self.contact))
-            post()            
+            post()
         except Exception as ex:
             print(ex)
+            self.contact = None
             self.get_connection()
             sock.connect((self.contact))
             post()
-        
+
         utils_tracker.close_connection(sock)
 
 
@@ -131,7 +134,7 @@ class Database:
         value, name, to_update = assign
         if not isinstance(name, list): name = [name]
         sock = socket.socket()
-        
+
         def post():
             msg, is_json_serializable = None, True
             is_file = False
@@ -144,35 +147,37 @@ class Database:
                 msg = utils_tracker.build_PUBLISH_msg(ID, path, 'file', to_update)
                 msg = json.dumps(msg).encode()
                 is_file = True
-                
+
             sock.sendall(msg + b'\r\n\r\n')
             # print(f'SENDING MSG:\n{msg}')
             if not is_json_serializable:
                 self._send_bytes(value)
-            
+
             if name or is_file:
-                patterns = list(utils_tracker.get_substrings(name[0])) + name[1:]
+                # patterns = list(utils_tracker.get_substrings(name[0])) + name[1:]
+                patterns = list(utils_tracker.get_prefixes(name[0].lower().strip())) + name[1:]
                 patterns = list(set(patterns))
                 store_value = { p:[ID] for p in patterns }
                 # msg = utils_tracker.build_PUBLISH_msg(utils_tracker.INDEX_KEY, (ID, patterns), to_update=True)
                 msg = utils_tracker.build_PUBLISH_msg(utils_tracker.INDEX_KEY, store_value, to_update=True)
                 msg = json.dumps(msg).encode()
                 sock2 = socket.socket()
-                sock2.connect((self.contact)) 
+                sock2.connect((self.contact))
                 sock2.sendall(msg + b'\r\n\r\n')
                 sock2.close()
                 # print(f'SENDING MSG:\n{msg}')
-            
+
             sock.close()
 
         try:
             sock.connect((self.contact))
-            post()            
+            post()
         except:
+            self.contact = None
             self.get_connection()
             sock.connect((self.contact))
             post()
-        
+
         utils_tracker.close_connection(sock)
 
     def find_keys_by_name(self, name):
@@ -188,16 +193,17 @@ class Database:
 
             return value[name]
 
-        sock = socket.socket() 
+        sock = socket.socket()
         try:
             sock.connect((self.contact))
             value = get(sock)
             utils_tracker.close_connection(sock)
             return value[name]
         except:
+            self.contact = None
             self.get_connection()
             sock.connect((self.contact))
-        
+
         value = get(sock)
         utils_tracker.close_connection(sock)
         return value[name]
@@ -211,7 +217,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # start(args.input)
-    hostname = socket.gethostname()    
+    hostname = socket.gethostname()
     IP = socket.gethostbyname(hostname)
     # IP = '192.168.43.144'
     import time

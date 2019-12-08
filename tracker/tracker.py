@@ -34,10 +34,18 @@ class Tracker:
                 if not msg:
                     break
                 # threading._start_new_thread(self.proccess_message, ())
+            threading.current_thread()._delete()
+
+        def attend_saved(sock):
+            try:
+                attend(c)
+            except Exception as ex:
+                print('EXCEPCION EN attend_clients')
+                print(ex)
 
         while True:
             c, _ = sock.accept()
-            threading._start_new_thread(attend, (c,))
+            threading._start_new_thread(attend_saved, (c,))
 
     def proccess_message(self, data, addr):
         if data['operation'] == 'DISCOVER':
@@ -50,12 +58,18 @@ class Tracker:
                 sock.send(json.dumps(my_addr).encode())
             except: pass
             sock.close()
+        threading.current_thread()._delete()
 
     def attend_new_nodes(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.bind(('', 6666))
         while True:
-            msg, _ = sock.recvfrom(1024)
+            try:
+                msg, _ = sock.recvfrom(1024)
+            except Exception as e:
+                print('EXCEPCION EN attend_new_nodes')
+                print(e)
+                continue
 
             if msg is not None:
                 data = json.loads(msg)
@@ -63,21 +77,14 @@ class Tracker:
                 threading._start_new_thread(self.proccess_message, (data, addr))
 
     def __init__(self, ip, port=5050, request_interval=5, min_interval=5):
-        #real app
         self.database = Database(ip, port)
-
-        #develop
-        # self.database = {}
-
         threading._start_new_thread(self.attend_clients, ())
         threading._start_new_thread(self.attend_new_nodes, ())
 
     def build_response(self, request):
-
         answer = {}
-
         answer["peers"] = self.database[get_key(request['name'] + request['infohash'] + 'peers')]
-
+        answer["peers"] = answer["peers"] if answer["peers"] else []
         return answer
 
 
@@ -92,34 +99,22 @@ def announce():
 
 @app.route('/have/<client_id>/<ip>/<port>/<portion>/<name>/<infohash>', methods=["PUT"])
 def have(client_id, ip, port, portion, name, infohash):
-
-    #real app
     TRACKER.database[name + infohash + "peers"] = utils_tracker.assign(data={"ip": ip, "port": int(port), "id": client_id}, to_update=True)
-
-    #develop
-    # try:
-    #     TRACKER.database[get_key(name + infohash + "peers")].append({"ip": ip, "port": int(port), "id": client_id})
-    # except:
-    #     TRACKER.database[get_key(name + infohash + "peers")] = [{"ip": ip, "port": int(port), "id": client_id}]
-
     return ""
 
 @app.route('/search')
 def search():
-    #Real app
     pattern_torrents_keys_dic = TRACKER.database[utils_tracker.INDEX_KEY]
     name = flask.request.args["name"]
-    torrent_keys = pattern_torrents_keys_dic[name]
+    
+    torrent_keys = []
+    if name in pattern_torrents_keys_dic:
+        torrent_keys = pattern_torrents_keys_dic[name]
 
     metainfos = []
     for key in torrent_keys:
         metainfo = TRACKER.database[key]
         metainfos.append(metainfo)
-
-    #develop
-    # name = flask.request.args["name"]
-    # metainfos = TRACKER.database[name]
-
     return json.dumps(metainfos)
 
 @app.route('/metainfo/<client_id>/<ip>/<port>', methods=["POST"])
@@ -133,13 +128,6 @@ def metainfo(client_id, ip, port):
         #Real app
         TRACKER.database[name + infohash + "metainfo"] = utils_tracker.assign(metainfo_decoded, name)
         TRACKER.database[name + infohash + "peers"] = utils_tracker.assign({"ip": ip, "port": int(port), "id": client_id}, to_update=True)
-
-        #develop
-        # try:
-        #     TRACKER.database[name].append(metainfo_decoded)
-        # except:
-        #     TRACKER.database[name] = [metainfo_decoded]
-        
 
         return ""
 

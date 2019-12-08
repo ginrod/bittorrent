@@ -21,6 +21,16 @@ class Node:
 
         self.route_table = [[] for _ in range(B)]
         self.store_lock = threading.Lock()
+        self.database = utils.load_json(self.storage)
+        threading._start_new_thread(self.persist_database, ())
+
+    def persist_database(self, time_unit=5):
+        import time
+        while True:
+            self.store_lock.acquire()
+            utils.dump_json(self.database, self.storage)
+            self.store_lock.release()
+            time.sleep(time_unit)
 
     def __repr__(self):
         return f'({self.ID}, {self.ip}, {self.port})'
@@ -63,29 +73,25 @@ class Node:
 
     def FIND_VALUE(self, ID):
         self.store_lock.acquire()
-        data = utils.load_json(self.storage)
-        if str(ID) in data:
-            file_bytes = None
-            if data[str(ID)]['value_type'] == 'file': 
-                file_bytes = utils.load_file(data[str(ID)]['value']) 
-            
+        # data = utils.load_json(self.storage)
+        if str(ID) in self.database:
             self.store_lock.release()
-            return (True, data[str(ID)], file_bytes)
-        
+            return (True, self.database[str(ID)], None)
+
         self.store_lock.release()
         return (False, self.FIND_NODE(ID), None)
-    
+
     def STORE(self, key, value, publisher, sender, value_type='json', real_value=None, to_update=False):
-        self.store_lock.acquire()
         # print(f'STORING key:{key}, value:{value}')
         key = str(key)
 
-        database = utils.load_json(self.storage)
+        # database = utils.load_json(self.storage)
         data = {'value': value }
 
-        if key in database:
-            data = database[key]
-            
+        self.store_lock.acquire()
+        if key in self.database:
+            data = self.database[key]
+
             # If the value to save is a file parm value is the path and real_value the file bytes array
             if real_value: utils.save_file(value, real_value)
 
@@ -103,11 +109,11 @@ class Node:
             data['value_type'] = value_type
             data['to_update'] = to_update
 
-        database[key] = data
+        self.database[key] = data
 
         # if database:
-        utils.dump_json(database, self.storage)
-        
+        # utils.dump_json(database, self.storage)
+
         self.store_lock.release()
 
     def PING(self):
@@ -132,20 +138,20 @@ class Node:
             if len(n_closest) + len(heap) >= n:
                 for _ in range(n - len(n_closest)):
                     n_closest.append(heapq.heappop(heap))
-            
+
         if len(n_closest) < n:
             top = min(n - len(n_closest), len(heap))
-            for _ in range(top): 
+            for _ in range(top):
                 n_closest.append(heapq.heappop(heap))
-        
+
         return n_closest
 
     def asTuple(self):
         return tuple(iter(self))
-        
+
     def asList(self):
         return list(iter(self))
-    
+
     @staticmethod
     def Equals(n1, n2):
         n1, n2 = list(iter(n1)), list(iter(n2))
