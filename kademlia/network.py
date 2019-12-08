@@ -830,9 +830,4 @@ if __name__ == '__main__':
     threading._start_new_thread(peer.check_network, ())
     threading._start_new_thread(peer.attend_clients, ())
     threading._start_new_thread(peer.attend_new_nodes, ())
-<<<<<<< HEAD
     peer.serve()
-=======
-    peer.serve()
-    while True: pass
->>>>>>> 5fdfe9093705d71ac734ed245317d7d66915ee0c
