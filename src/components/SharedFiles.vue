@@ -46,7 +46,7 @@ export default {
       // .then(res => {
       //   res.body;
       // });
-      fetch('http://192.168.1.104:5001/share', {
+      fetch('http://192.168.1.102:5001/share', {
         method: 'POST',
         body:JSON.stringify( { path: this.path } )
         }).then((res) => res.json());

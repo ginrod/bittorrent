@@ -16,7 +16,7 @@ class Database:
             else:
                 udp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 udp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-                udp_sock.sendto(broadcast_msg, ('255.255.255.255', 8080))
+                udp_sock.sendto(broadcast_msg, ('255.255.255.255', 8081))
 
         # threading._start_new_thread(do_broadcast, )
         do_broadcast()
