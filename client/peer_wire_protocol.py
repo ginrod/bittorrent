@@ -131,14 +131,15 @@ class Peer:
         
         msg_sent = False
 
-        for i in range(start, len(self.files[infohash]['bitfield'])):
+        # for i in range(start, len(self.files[infohash]['bitfield'])):
+        for i in range(0, len(self.files[infohash]['bitfield'])):
             for j, b in enumerate(peers_bitfields):
                 try:
 
                     if b[i] and not self.files[infohash]["bitfield"][i]:
                         #connect to the peer
                         tcp_client = socket.socket()
-                        tcp_client.settimeout(1)
+                        
                         addr = (active_peers[j]['ip'], active_peers[j]['port'] + 1)
                         tcp_client.connect(addr)
 
@@ -192,7 +193,7 @@ class Peer:
                             json.dump(self.files, json_file)
                         self.files_shared_lock.release()
 
-                        start += 1
+                        # start += 1
 
                         #close the connection with tracker
                         connection.close()

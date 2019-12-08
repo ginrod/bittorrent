@@ -141,7 +141,8 @@ class Client:
             request = self.create_announce_request(_metainfo, TRACKER_URL, uploaded, downloaded, "started")
             response = self.make_announce_request(connection, request)
             start = self.peer.download(response['peers'], _metainfo, start)
-            complete = (start == _metainfo['info']['no_pieces'])
+            # complete = (start == _metainfo['info']['no_pieces'])
+            complete = all(file_info["bitfield"])
 
         try: connection.close()
         except: pass

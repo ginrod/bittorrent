@@ -23,7 +23,7 @@ class Tracker:
     # 6666
     def attend_clients(self):
         sock = socket.socket()
-        sock.bind(('', 6660))
+        sock.bind((self.database.ip, 6660))
         sock.listen(256)
 
         def attend(client):
@@ -63,7 +63,7 @@ class Tracker:
 
     def attend_new_nodes(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind(('', 6666))
+        sock.bind((self.database.ip, 6666))
         while True:
             try:
                 msg, _ = sock.recvfrom(1024)
@@ -151,4 +151,4 @@ if __name__ == "__main__":
 
     # TRACKER = Tracker("localhost", 5000)
 
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host=IP, port=5000)

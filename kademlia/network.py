@@ -678,7 +678,7 @@ class Peer:
             except Exception as ex:
                 print('EXCEPCION EN attend_clients')
                 print(ex)
-                exit_thread()
+            exit_thread()
 
         while True:
             c, _ = self.tcp_server.accept()
