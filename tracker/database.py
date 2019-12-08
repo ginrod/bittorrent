@@ -153,19 +153,22 @@ class Database:
             if not is_json_serializable:
                 self._send_bytes(value)
 
-            if name or is_file:
-                # patterns = list(utils_tracker.get_substrings(name[0])) + name[1:]
-                patterns = list(utils_tracker.get_prefixes(name[0].lower().strip())) + name[1:]
-                patterns = list(set(patterns))
-                store_value = { p:[ID] for p in patterns }
-                # msg = utils_tracker.build_PUBLISH_msg(utils_tracker.INDEX_KEY, (ID, patterns), to_update=True)
-                msg = utils_tracker.build_PUBLISH_msg(utils_tracker.INDEX_KEY, store_value, to_update=True)
-                msg = json.dumps(msg).encode()
-                sock2 = socket.socket()
-                sock2.connect((self.contact))
-                sock2.sendall(msg + b'\r\n\r\n')
-                sock2.close()
-                # print(f'SENDING MSG:\n{msg}')
+            if len(name) == 1 and name[0] == '':
+                sock.close()
+                return
+
+            # patterns = list(utils_tracker.get_substrings(name[0])) + name[1:]
+            patterns = list(utils_tracker.get_prefixes(name[0].lower().strip())) + name[1:]
+            patterns = list(set(patterns))
+            store_value = { p:[ID] for p in patterns }
+            # msg = utils_tracker.build_PUBLISH_msg(utils_tracker.INDEX_KEY, (ID, patterns), to_update=True)
+            msg = utils_tracker.build_PUBLISH_msg(utils_tracker.INDEX_KEY, store_value, to_update=True)
+            msg = json.dumps(msg).encode()
+            sock2 = socket.socket()
+            sock2.connect((self.contact))
+            sock2.sendall(msg + b'\r\n\r\n')
+            sock2.close()
+            # print(f'SENDING MSG:\n{msg}')
 
             sock.close()
 

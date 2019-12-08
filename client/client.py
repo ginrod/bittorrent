@@ -229,6 +229,7 @@ if __name__ == "__main__":
                 _metainfos = c.request_metainfo(param.lower().strip())
                 if _metainfos == []:
                     print("There isn't a torrent for that name on the network")
+                    continue
                 for i, m in enumerate(_metainfos):
                     print(f"{i}. {m['info']['name']}")
                 idx = int(input("Select file to download:"))
