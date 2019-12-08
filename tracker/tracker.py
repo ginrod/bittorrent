@@ -42,6 +42,7 @@ class Tracker:
             except Exception as ex:
                 print('EXCEPCION EN attend_clients')
                 print(ex)
+            threading.current_thread()._delete()
 
         while True:
             c, _ = sock.accept()
