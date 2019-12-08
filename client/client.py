@@ -207,7 +207,7 @@ if __name__ == "__main__":
     import argparse, socket
     parser = argparse.ArgumentParser()
     parser.add_argument('-port', '--port', type=int, default=7008)
-    parser.add_argument('-ip', '--ip', type=str, default='192.168.1.102')
+    parser.add_argument('-ip', '--ip', type=str, default=None)
 
     args = parser.parse_args()
 

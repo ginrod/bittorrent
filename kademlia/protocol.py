@@ -77,7 +77,6 @@ class Node:
         if str(ID) in self.database:
             self.store_lock.release()
             return (True, self.database[str(ID)], None)
-
         self.store_lock.release()
         return (False, self.FIND_NODE(ID), None)
 
@@ -91,7 +90,6 @@ class Node:
         self.store_lock.acquire()
         if key in self.database:
             data = self.database[key]
-
             # If the value to save is a file parm value is the path and real_value the file bytes array
             if real_value: utils.save_file(value, real_value)
 
@@ -113,7 +111,6 @@ class Node:
 
         # if database:
         # utils.dump_json(database, self.storage)
-
         self.store_lock.release()
 
     def PING(self):
