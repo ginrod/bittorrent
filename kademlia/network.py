@@ -518,7 +518,7 @@ class Peer:
         else:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            sock.sendto(broadcast_msg, ('255.255.255.255', 8080))
+            sock.sendto(broadcast_msg, ('255.255.255.255', 8081))
             # sock.sendto(broadcast_msg, ('255.255.255.255', 8081))
 
     def join(self):
@@ -686,7 +686,7 @@ class Peer:
 
     def attend_new_nodes(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind((self.node.ip, 8080))
+        sock.bind((self.node.ip, 8081))
         while True:
             msg = None
             try:
