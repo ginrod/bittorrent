@@ -17,6 +17,8 @@ def exit_thread():
 
 
 INDEX_KEY = 661843241451724053717825306583068845753374048118
+JOINED_LOCK = threading.Lock()
+JOINED = set()
 
 class Peer:
 
@@ -51,7 +53,6 @@ class Peer:
                 print(ex)
                 continue
 
-            print('RECVFROM IN serve')
             if msg is not None:
                 data = json.loads(msg)
 
@@ -68,7 +69,8 @@ class Peer:
     def proccess_message(self, data, addr, running_in_thread=False):
         # data = json.loads(msg)
         if data['operation'] != 'DISCOVER':
-            print("Data received: " + str(data))
+            # print("Data received: " + str(data))
+            pass
 
         if data['operation'] == 'DISCOVER':
             if data['join']:
@@ -79,8 +81,13 @@ class Peer:
 
                     self.send_udp_msg(json.dumps(answer).encode(), addr)
                     self.update(tuple(data['sender']))
-                    print(f"{data['sender']} joined")
-
+                    # print(f"{data['sender']} joined")
+                    _, ip, port = data['sender']
+                    if (ip, port) not in JOINED:
+                        JOINED_LOCK.acquire()
+                        JOINED.add((ip, port))
+                        JOINED_LOCK.release()
+                        print(f'({ip, port}) joined')
             else:
                 if addr != (self.node.ip, self.node.port):
                     ip, port = str(data['ip']), int(data['port'])
@@ -89,6 +96,13 @@ class Peer:
                     except: pass
 
         elif data['operation'] == 'CONTACT':
+            _, ip, port = data['sender']
+            if (ip, port) not in JOINED:
+                JOINED_LOCK.acquire()
+                JOINED.add((ip, port))
+                JOINED_LOCK.release()
+                print(f'{ip, port} joined')
+
             contact = tuple(data['sender'])
             self.update(contact)
             self.lookup_node(self.node.ID)
@@ -530,7 +544,7 @@ class Peer:
         # while not has_contact(self):
         while True:
             self.discover()
-            time.sleep(1)
+            time.sleep(3)
 
         # self.node.print_routing_table()
 
