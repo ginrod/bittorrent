@@ -14,10 +14,10 @@ import threading, utils_client
 PIECE_LENGTH = 1024
 
 #develop
-TRACKER_IP = "localhost"
-TRACKER_PORT = 5000
+# TRACKER_IP = "localhost"
+# TRACKER_PORT = 5000
 
-TRACKER_URL = f"{TRACKER_IP}:{TRACKER_PORT}"
+# TRACKER_URL = f"{TRACKER_IP}:{TRACKER_PORT}"
 
 def get_infohash(metainfo):
     return hashlib.sha1(torrent_parser.encode(metainfo["info"])).hexdigest()

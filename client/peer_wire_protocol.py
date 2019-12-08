@@ -32,6 +32,7 @@ class Peer:
         try:
             sock.connect((self.contact))
         except:
+            self.contact = None
             self.get_connection()
 
         return self.contact

@@ -1,6 +1,6 @@
 import sys, hashlib, os, torrent_parser, time
 
-MAX_PIECE_SIZE = 1024 * 1024 * 5
+MAX_PIECE_SIZE = 1024 * 1024
 
 def generate_hash(piece, hash_func):
     h = hash_func(piece)

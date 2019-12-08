@@ -29,7 +29,8 @@ class Node:
         while True:
             self.store_lock.acquire()
             utils.dump_json(self.database, self.storage)
-            self.store_lock.release()
+            try: self.store_lock.release()
+            except: pass
             time.sleep(time_unit)
 
     def __repr__(self):
@@ -72,12 +73,13 @@ class Node:
         return self.ID ^ int(other[0])
 
     def FIND_VALUE(self, ID):
-        self.store_lock.acquire()
-        # data = utils.load_json(self.storage)
+        # self.store_lock.acquire()
         if str(ID) in self.database:
-            self.store_lock.release()
+            try:
+                self.store_lock.release()
+            except: pass
             return (True, self.database[str(ID)], None)
-        self.store_lock.release()
+        # self.store_lock.release()
         return (False, self.FIND_NODE(ID), None)
 
     def STORE(self, key, value, publisher, sender, value_type='json', real_value=None, to_update=False):
@@ -91,7 +93,7 @@ class Node:
         if key in self.database:
             data = self.database[key]
             # If the value to save is a file parm value is the path and real_value the file bytes array
-            if real_value: utils.save_file(value, real_value)
+            # if real_value: utils.save_file(value, real_value)
 
             data['value'] = value
             now = datetime.datetime.now()
@@ -108,10 +110,9 @@ class Node:
             data['to_update'] = to_update
 
         self.database[key] = data
-
-        # if database:
-        # utils.dump_json(database, self.storage)
-        self.store_lock.release()
+        try:
+            self.store_lock.release()
+        except: pass
 
     def PING(self):
         return True

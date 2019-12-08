@@ -39,6 +39,8 @@ class Peer:
 
         # utils.create_dirs('files/storage/files')
         self.recvfile_lock = threading.Lock()
+        self.kBucketRefreshTimes_lock = threading.Lock()
+        self.reponses_lock = threading.Lock()
 
     def serve(self):
         print('Peer with ID ' + str(self.node.ID) + " serving at : " +  str(self.node.ip) + ":" + str(self.node.port))
@@ -221,7 +223,6 @@ class Peer:
 
         # database = Database(self.node.ip, 5050, contact=(self.node.ip, self.tcp_server_port))
         # database = Database(self.node.ip, 5050, contact=(self.node.ip, 9000))
-        self.node.store_lock.acquire()
         for key, data in self.node.database.items():
             original_republish = True if datetime.datetime.now() - data['timeo'] < datetime.timedelta(seconds=240) else False
             # original_republish = True if datetime.datetime.now() - data['timeo'] < datetime.timedelta(seconds=24) else False
@@ -237,9 +238,6 @@ class Peer:
             # if datetime.datetime.now() - data['timer'] >= datetime.timedelta(seconds=1):
             # if datetime.datetime.now() - data['timer'] >= datetime.timedelta(hours=1):
 
-                if key == 313739178002997716893868377970529607482382768949 or key == '313739178002997716893868377970529607482382768949':
-                    pa_entrar_aqui = True
-
                 # Republishing
                 # self.publish(data, data['publisher'], self.node.asTuple())
                 file_bytes = None
@@ -254,12 +252,11 @@ class Peer:
                 # if data['value_type']
 
         for key in keys_to_drop:
+            self.node.store_lock.acquire()
             self.node.database.pop(key)
-
-        # if my_local_database:
-        # if change: utils.dump_json(my_local_database, self.node.storage)
-        self.node.store_lock.release()
-
+            try:
+                self.node.store_lock.release()
+            except: pass
 
     def check_network(self, time_unit=1):
 
@@ -321,10 +318,12 @@ class Peer:
 
     def _update_kbucket_time(self, idx, t, running_in_thread=False):
         if self.kBucketRefreshTimes[idx] >= t: return
-        self.lock.acquire()
+        self.kBucketRefreshTimes_lock.acquire()
         if self.kBucketRefreshTimes[idx] >= t: return
         self.kBucketRefreshTimes[idx] = t
-        self.lock.release()
+        try:
+            self.kBucketRefreshTimes_lock.release()
+        except: pass
         if running_in_thread:
             exit_thread()
 
@@ -476,9 +475,11 @@ class Peer:
         # return None
         # while expected_key not in self.reponses: pass
         if expected_key not in self.reponses: return None
-        self.lock.acquire()
+        self.reponses_lock.acquire()
         ans = self.reponses.pop(expected_key)
-        self.lock.release()
+        try:
+            self.reponses_lock.release()
+        except: pass
         return ans
 
     def receive_from(self, timeout=2.5):
@@ -496,14 +497,18 @@ class Peer:
         return msg, addr
 
     def set_response(self, key, value, timeout=2.5):
-        self.lock.acquire()
+        self.reponses_lock.acquire()
         self.reponses[key] = value
-        self.lock.release()
+        try:
+            self.reponses_lock.release()
+        except: pass
 
     def delete_response(self, key, timeout=2.5):
-        self.lock.acquire()
+        self.reponses_lock.acquire()
         self.reponses.pop(key)
-        self.lock.release()
+        try:
+            self.reponses_lock.release()
+        except: pass
 
     def discover(self, localhost_only=False):
         broadcast_msg = { 'operation': 'DISCOVER', 'join': True, 'sender': list(self.node), 'key': utils.generate_random_id() }
@@ -564,8 +569,10 @@ class Peer:
 
         sender.close()
         sock.close()
-
-        self.recvfile_lock.release()
+        
+        try:
+            self.recvfile_lock.release()
+        except: pass
         return data
 
     def recvall(self, client):
@@ -709,7 +716,6 @@ class Peer:
     def _update_peers_list(self, key, value, publisher, sender):
         key = str(key)
 
-        self.node.store_lock.acquire()
         # database = utils.load_json(self.node.storage)
         # print(f'UPDATING {key}:{value}')
         if key in self.node.database:
@@ -722,12 +728,12 @@ class Peer:
             ids = set([dic['id'] for dic in self.node.database[key]['value']])
             for dic in value:
                 if dic['id'] not in ids:
+                    self.node.store_lock.acquire()
                     self.node.database[key]['value'].append(dic)
-
-            # utils.dump_json(database, self.node.storage)
-            self.node.store_lock.release()
+                    try:
+                        self.node.store_lock.release()
+                    except: pass
         else:
-            self.node.store_lock.release()
             if not isinstance(value, list): value = [value]
             self.node.STORE(key, value, publisher, sender, to_update=True)
 
@@ -737,26 +743,46 @@ class Peer:
         # database = utils.load_json(self.node.storage)
 
         if key not in self.node.database:
+            self.node.store_lock.acquire()
             self.node.database[key] = {}
             self.node.database[key]['value'] = value
             self.node.database[key]['timeo'] = self.node.database[key]['timer'] = datetime.datetime.now()
             self.node.database[key]['value_type'] = 'json'
             self.node.database[key]['to_update'] = True
             self.node.database[key]['publisher'] = publisher
+            try:
+                self.node.store_lock.release()
+            except: pass
         else:
             for p in value:
                 if p not in self.node.database[key]['value']:
+                    self.node.store_lock.acquire()
                     self.node.database[key]['value'][p] = value[p]
+                    try:
+                        self.node.store_lock.release()
+                    except: pass
                 else:
                     new_keys = self.node.database[key]['value'][p] + value[p]
                     new_keys = list(set(new_keys))
+                    self.node.store_lock.acquire()
                     self.node.database[key]['value'][p] = new_keys
+                    try:
+                        self.node.store_lock.release()
+                    except: pass
 
             now = datetime.datetime.now()
             if sender == publisher:
+                self.node.store_lock.acquire()
                 self.node.database[key]['timeo'] = now
+                try:
+                    self.node.store_lock.release()
+                except: pass
 
+            self.node.store_lock.acquire()
             self.node.database[key]['timer'] = now
+            try:
+                self.node.store_lock.release()
+            except: pass
 
         # utils.dump_json(database, self.node.storage)
 
@@ -764,9 +790,7 @@ class Peer:
         # Updating names
 
         if int(key) == utils.INDEX_KEY:
-            self.node.store_lock.acquire()
             self._update_names_dic(key, value, publisher, sender)
-            self.node.store_lock.release()
         else:
             # Updating peers list
             self._update_peers_list(key, value, publisher, sender)
