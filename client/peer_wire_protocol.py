@@ -24,7 +24,7 @@ class Peer:
                 self.contact = utils_client.find_contact(self.ip)
             except:
                 pass
-            time.sleep(0.5)
+
 
     def check_tracker(self):
         import socket
@@ -65,7 +65,7 @@ class Peer:
         active_peers = [] #Peers of the peers list that are connected
 
         #handshake round
-        
+
         for p in peers:
             if p['ip'] == self.ip and p['port'] == self.client_port:
                 continue
@@ -128,7 +128,7 @@ class Peer:
 
 
 
-        
+
         msg_sent = False
 
         for i in range(start, len(self.files[infohash]['bitfield'])):
@@ -138,24 +138,19 @@ class Peer:
                     if b[i] and not self.files[infohash]["bitfield"][i]:
                         #connect to the peer
                         tcp_client = socket.socket()
-                        tcp_client.settimeout(1)
+                        tcp_client.settimeout(2)
                         addr = (active_peers[j]['ip'], active_peers[j]['port'] + 1)
                         tcp_client.connect(addr)
 
                         #request the piece
-                        # print(f"Requesting piece {i}")
                         piece(tcp_client, i, infohash, metainfo["info"]["piece_length"])
 
                         #download the piece
-                        # print(f"Copying piece {i}")
-                        # data = self.tcp_client.recv(metainfo["info"]["piece_length"] * 2)
                         data = self.recv_all(tcp_client)
                         if not data:
                             continue
-                        # print(f"Piece {i} copied successfully")
 
                         #write the whole piece in the partial file of the download
-                        # print(f"Copying piece {i}")
                         try:
                             try:
                                 os.makedirs(f'downloaded')
@@ -197,13 +192,15 @@ class Peer:
                         #close the connection with tracker
                         connection.close()
 
-                except:
+                except Exception as e:
+                    print("When downloading...")
+                    print(e)
                     continue
 
         return start
 
     def accept_connections(self):
-        
+
         def serve_saved(conn, ad):
             try:
                 self.serve(conn, ad)
@@ -222,13 +219,15 @@ class Peer:
         # print("Serving on port: " + str(self.server_port))
         #Peers may close a connection if they receive no messages for a certain period of time.
         #Two minutes is the default value for timeout
-        connection.settimeout(120)
+        connection.settimeout(10)
 
         infohash = ""
 
         try:
             msg = connection.recv(1024)
-        except:
+        except Exception as e:
+            print("In serve:")
+            print(e)
             return
 
         if not msg:
@@ -285,7 +284,3 @@ class Peer:
             data += chunk
             chunk = connection.recv(1024 * 1024)
         return data
-
-
-# if __name__ == "__main__":
-    # A = Peer("127.0.0.1", 8000, 8001)
