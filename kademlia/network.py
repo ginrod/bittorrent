@@ -809,7 +809,7 @@ if __name__ == '__main__':
     parser.add_argument('-uport', '--udp_port', type=int, default=8000)
     parser.add_argument('-id', '--id', type=int, default=-1)
     parser.add_argument('-tport', '--tcp_server_port', type=int, default=9000)
-    parser.add_argument('-ip', '--ip', type=str, default=None)
+    parser.add_argument('-ip', '--ip', type=str, default="192.168.1.104")
 
     args = parser.parse_args()
 
