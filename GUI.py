@@ -57,7 +57,8 @@ def shared():
 
 @app.route('/share/<path>')
 def share(path):
-    name, size = CLIENT.share(path)
+    # name, size = CLIENT.share(path)
+    name, size = CLIENT.perfoming_share(path)
     return jsonify(name=name, size=size)
 
 
