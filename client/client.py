@@ -120,14 +120,15 @@ class Client:
         infohash = utils_client.get_infohash(_metainfo)
 
         self.peer.files_shared_lock.acquire()
-        self.peer.files[infohash] = {}
-        file_info = self.peer.files[infohash]
-        file_info["bitfield"] = [False for _ in range(_metainfo["info"]["no_pieces"])]
-        file_info["piece_length"] = _metainfo["info"]["piece_length"]
-        file_info["path"] = f"downloaded/{_metainfo['info']['name']}"
-        file_info["length"] = _metainfo["info"]["length"]
-        with open(f"files_shared.json", "w") as json_file:
-            json.dump(self.peer.files, json_file)
+        if infohash not in self.peer.files:
+            self.peer.files[infohash] = {}
+            file_info = self.peer.files[infohash]
+            file_info["bitfield"] = [False for _ in range(_metainfo["info"]["no_pieces"])]
+            file_info["piece_length"] = _metainfo["info"]["piece_length"]
+            file_info["path"] = f"downloaded/{_metainfo['info']['name']}"
+            file_info["length"] = _metainfo["info"]["length"]
+            with open(f"files_shared.json", "w") as json_file:
+                json.dump(self.peer.files, json_file)
         self.peer.files_shared_lock.release()
 
         complete = False
